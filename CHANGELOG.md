@@ -28,6 +28,17 @@ change the Go API; every such change carries a migration note. The protocol
 - Golden tests that bind every example of `docs/PROTOCOL.md` to the Go types; a
   new example in the document fails the build until it has a golden file.
 
+- `jsonl` package: a line scanner that accepts lines up to 64 MiB and keeps
+  working after an over-long line, and a concurrency-safe JSON line writer.
+- `redact` package: secret scrubbing for logs and errors (registered secrets plus
+  common key formats).
+- `logx` package: the protocol's JSON stderr logger with the level from
+  `ARVEL_LOG_LEVEL`, redaction of every string, and `Truncate` for debug prompts.
+- `procx` package: finding vendor binaries, version probe, a minimal child
+  environment (with the sandbox proxy variables and a list of variables that are
+  never passed on), and starting, interrupting and killing whole process trees on
+  Linux, macOS and Windows, including `.cmd` and `.bat` shims.
+
 ### Changed
 - `docs/PROTOCOL.md` synced with the workspace sandbox (S7): new §15 Workspace
   sandbox, the manifest `sandbox` block, the `initialize` `sandbox` field, one
@@ -35,7 +46,8 @@ change the Go API; every such change carries a migration note. The protocol
   conformance note. The change is additive within `pluginApi: "1"`.
 
 ### API changes
-- New exported packages `protocol`, `manifest` and `schema`. All changes are
-  additive; there are no breaking changes.
+- New exported packages `protocol`, `manifest`, `schema`, `jsonl`, `redact`,
+  `logx` and `procx`. All changes are additive; there are no breaking changes.
 - New dependencies: `github.com/santhosh-tekuri/jsonschema/v6` and
-  `golang.org/x/mod` (plus `golang.org/x/text`, which `jsonschema` needs).
+  `golang.org/x/mod` (plus `golang.org/x/text`, which `jsonschema` needs), and
+  `golang.org/x/sys` (used only by the Windows code of `procx`).
