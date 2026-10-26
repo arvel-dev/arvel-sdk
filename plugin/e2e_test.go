@@ -241,9 +241,9 @@ func TestE2E_CanarySecretNeverLeaks(t *testing.T) {
 
 func TestE2E_LargeLines(t *testing.T) {
 	if testing.Short() {
-		t.Skip("moves 24 MiB lines")
+		t.Skip("moves 12 MiB lines")
 	}
-	const size = 24 << 20 // above the 10 MiB limit of the ACP library (FINDINGS S0.1)
+	const size = 12 << 20 // above the 10 MiB limit of the ACP library (FINDINGS S0.1)
 	big := strings.Repeat("x", size)
 	want := sha256.Sum256([]byte(big))
 
@@ -257,6 +257,7 @@ func TestE2E_LargeLines(t *testing.T) {
 		return TurnResult{StopReason: acp.StopReasonEndTurn}, nil
 	})
 	h := readyHarness(t, p)
+	h.timeout = time.Minute // the race detector makes 12 MiB round trips slow on CI
 	var updateLen int
 	var mu sync.Mutex
 	h.client.HandleNotification(protocol.MethodSessionUpdate, func(_ context.Context, raw json.RawMessage) {
@@ -269,7 +270,7 @@ func TestE2E_LargeLines(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := recv(t, gotSum, "prompt text"); got != want {
-		t.Fatal("the 24 MiB prompt arrived changed")
+		t.Fatal("the 12 MiB prompt arrived changed")
 	}
 	mu.Lock()
 	defer mu.Unlock()

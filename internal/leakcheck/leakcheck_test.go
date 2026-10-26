@@ -20,6 +20,9 @@ func (f *fakeT) Fatalf(format string, args ...any) {
 	f.msg = fmt.Sprintf(format, args...)
 }
 
+// leakedForTest must not be inlined, or its name would vanish from the stack.
+//
+//go:noinline
 func leakedForTest(stop chan struct{}) { <-stop }
 
 func TestCheck_PassesWhenClean(t *testing.T) {

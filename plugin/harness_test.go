@@ -92,6 +92,8 @@ type harness struct {
 	closeStdin func()
 	// stdin is the plugin's stdin, for raw lines the client peer cannot send.
 	stdin io.Writer
+	// timeout bounds every call; slow tests raise it.
+	timeout time.Duration
 }
 
 func newHarness(t *testing.T, p Provider, opts ...Option) *harness {
@@ -110,7 +112,7 @@ func startHarness(t *testing.T, run func(context.Context, []Option) error, opts 
 	s2cR, s2cW := io.Pipe()
 	h := &harness{
 		t: t, stderr: &syncBuffer{}, wire: &syncBuffer{},
-		clock: fakeclock.New(testStart), done: make(chan struct{}),
+		clock: fakeclock.New(testStart), done: make(chan struct{}), timeout: 10 * time.Second,
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	h.cancel = cancel
@@ -143,7 +145,7 @@ func startHarness(t *testing.T, run func(context.Context, []Option) error, opts 
 
 func (h *harness) call(method string, params, result any) error {
 	h.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), h.timeout)
 	defer cancel()
 	return h.client.Call(ctx, method, params, result)
 }
