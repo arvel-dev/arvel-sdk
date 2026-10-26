@@ -39,6 +39,19 @@ change the Go API; every such change carries a migration note. The protocol
   never passed on), and starting, interrupting and killing whole process trees on
   Linux, macOS and Windows, including `.cmd` and `.bat` shims.
 
+- `jsonrpc` package: a bidirectional line-delimited JSON-RPC 2.0 peer that accepts
+  lines up to 64 MiB, survives an over-long line, handles requests concurrently
+  and delivers the notifications of a session in order, before the response that
+  follows them.
+- `plugin` package: `Run` for provider plugins and `RunRouter` for router
+  plugins. They answer `initialize`, the `_arvel/*` methods and the ACP session
+  methods, validate every result, redact secrets from logs and errors, throttle
+  usage updates, close idle sessions and reload them on demand, and shut down
+  cleanly on `_arvel/shutdown`, end of input or a signal.
+- `protocol/skills` package: `Materialize` copies the host's skill folders into
+  the vendor CLI's project skills directory, hides them from git and removes them
+  when the session ends.
+
 ### Changed
 - `docs/PROTOCOL.md` synced with the workspace sandbox (S7): new §15 Workspace
   sandbox, the manifest `sandbox` block, the `initialize` `sandbox` field, one
@@ -47,7 +60,10 @@ change the Go API; every such change carries a migration note. The protocol
 
 ### API changes
 - New exported packages `protocol`, `manifest`, `schema`, `jsonl`, `redact`,
-  `logx` and `procx`. All changes are additive; there are no breaking changes.
+  `logx`, `procx`, `jsonrpc`, `plugin` and `protocol/skills`. All changes are
+  additive; there are no breaking changes.
 - New dependencies: `github.com/santhosh-tekuri/jsonschema/v6` and
   `golang.org/x/mod` (plus `golang.org/x/text`, which `jsonschema` needs), and
   `golang.org/x/sys` (used only by the Windows code of `procx`).
+- New dependency: `github.com/coder/acp-go-sdk` (ACP schema types only; it adds no
+  further modules).
