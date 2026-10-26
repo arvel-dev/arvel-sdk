@@ -23,7 +23,10 @@ func (f *fakeT) Fatalf(format string, args ...any) {
 // leakedForTest must not be inlined, or its name would vanish from the stack.
 //
 //go:noinline
-func leakedForTest(stop chan struct{}) { <-stop }
+func leakedForTest(started, stop chan struct{}) {
+	close(started) // the function is on the stack from here on
+	<-stop
+}
 
 func TestCheck_PassesWhenClean(t *testing.T) {
 	ft := &fakeT{}
@@ -34,12 +37,13 @@ func TestCheck_PassesWhenClean(t *testing.T) {
 }
 
 func TestCheck_DetectsLeakedGoroutine(t *testing.T) {
-	stop := make(chan struct{})
+	started, stop := make(chan struct{}), make(chan struct{})
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		leakedForTest(stop)
+		leakedForTest(started, stop)
 	}()
+	<-started
 	ft := &fakeT{}
 	Check(ft, "leakedForTest")
 	close(stop)
