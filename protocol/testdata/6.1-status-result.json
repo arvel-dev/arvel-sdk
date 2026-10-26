@@ -1,0 +1,21 @@
+{
+  "state": "ready",
+  "message": "Signed in · Max plan",
+  "binary": {
+    "name": "claude",
+    "path": "/Users/me/.local/bin/claude",
+    "version": "2.1.310"
+  },
+  "account": {
+    "label": "me@example.com",
+    "plan": "max"
+  },
+  "billingNote": "Runs started by Arvel count as programmatic use of your plan.",
+  "actions": [
+    {
+      "id": "login",
+      "label": "Sign in",
+      "kind": "terminal"
+    }
+  ]
+}

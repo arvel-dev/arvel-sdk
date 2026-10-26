@@ -1,0 +1,8 @@
+{
+  "entry": {
+    "command": [
+      "gemini",
+      "--experimental-acp"
+    ]
+  }
+}

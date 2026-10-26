@@ -1,0 +1,13 @@
+{
+  "method": "_arvel/route/effort",
+  "params": {
+    "text": "…",
+    "roleId": "r_dev",
+    "kind": "code",
+    "levels": [
+      "low",
+      "medium",
+      "high"
+    ]
+  }
+}

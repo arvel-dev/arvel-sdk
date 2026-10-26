@@ -1,0 +1,19 @@
+{
+  "sessionId": "…",
+  "command": [
+    "claude",
+    "--session-id",
+    "…",
+    "--settings",
+    "…",
+    "--mcp-config",
+    "…",
+    "--append-system-prompt-file",
+    "…"
+  ],
+  "env": {
+    "…": "…"
+  },
+  "cwd": "…",
+  "observe": true
+}

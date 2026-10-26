@@ -1,0 +1,43 @@
+{
+  "result": {
+    "mcpServers": [
+      {
+        "name": "postgres",
+        "scope": "project",
+        "project": "/Users/me/code/shop-api",
+        "source": ".mcp.json",
+        "transport": "stdio",
+        "command": [
+          "npx",
+          "-y",
+          "@modelcontextprotocol/server-postgres@0.6.1"
+        ],
+        "env": {
+          "DATABASE_URL": {
+            "secret": true
+          }
+        }
+      },
+      {
+        "name": "github",
+        "scope": "user",
+        "source": "~/.claude.json",
+        "transport": "http",
+        "url": "https://mcp.github.example/v1",
+        "headers": {
+          "Authorization": {
+            "secret": true
+          }
+        }
+      }
+    ],
+    "skills": [
+      {
+        "name": "pest-tests",
+        "scope": "user",
+        "source": "~/.claude/skills/pest-tests",
+        "path": "/Users/me/.claude/skills/pest-tests"
+      }
+    ]
+  }
+}

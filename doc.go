@@ -4,6 +4,6 @@
 //
 // The module is the Go reference implementation of the Arvel Provider
 // Protocol. The importable packages live in sub-directories (protocol,
-// manifest, plugin, procx, jsonl, redact, logx, testkit); this root package
+// manifest, schema, plugin, procx, jsonl, redact, logx, testkit); this root package
 // only carries the module documentation.
 package arvelsdk

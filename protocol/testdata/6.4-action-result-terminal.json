@@ -1,0 +1,10 @@
+{
+  "kind": "terminal",
+  "command": [
+    "claude",
+    "auth",
+    "login"
+  ],
+  "env": {},
+  "explain": "Finish sign-in in this terminal."
+}

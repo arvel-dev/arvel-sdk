@@ -1,0 +1,44 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": 1,
+    "clientCapabilities": {
+      "fs": {
+        "readTextFile": false,
+        "writeTextFile": false
+      },
+      "terminal": false
+    },
+    "clientInfo": {
+      "name": "arvel",
+      "version": "1.0.0"
+    },
+    "_meta": {
+      "arvel": {
+        "pluginApi": "1",
+        "connection": {
+          "id": "c_01J...",
+          "kind": "subscription",
+          "config": {
+            "loadProjectSettings": false
+          },
+          "secrets": {}
+        },
+        "dataDir": "/Users/me/Library/Application Support/Arvel/plugins/claude/data/c_01J...",
+        "locale": "ru-RU",
+        "platform": {
+          "os": "darwin",
+          "arch": "arm64",
+          "remote": false
+        },
+        "sandbox": {
+          "mode": "os",
+          "proxy": "http://127.0.0.1:41234",
+          "workspace": "w_01J…"
+        }
+      }
+    }
+  }
+}

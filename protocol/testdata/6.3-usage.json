@@ -1,0 +1,26 @@
+{
+  "source": "exact",
+  "status": "ok",
+  "windows": [
+    {
+      "id": "five_hour",
+      "label": "5-hour window",
+      "usedPercent": 38,
+      "resetsAt": "2026-10-25T18:40:00Z",
+      "durationMinutes": 300
+    },
+    {
+      "id": "weekly",
+      "label": "Week",
+      "usedPercent": 61,
+      "resetsAt": "2026-10-26T09:00:00Z",
+      "durationMinutes": 10080
+    }
+  ],
+  "spend": {
+    "currency": "USD",
+    "sinceStart": 1.84,
+    "source": "estimated"
+  },
+  "updatedAt": "2026-10-25T16:48:00Z"
+}

@@ -1,0 +1,27 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "result": {
+    "preset": {
+      "presetId": "p_bug",
+      "confidence": 0.81
+    },
+    "steps": [
+      {
+        "stepId": "s1",
+        "include": false,
+        "confidence": 0.93
+      },
+      {
+        "stepId": "s2",
+        "include": false,
+        "confidence": 0.77
+      },
+      {
+        "stepId": "s5",
+        "include": true,
+        "confidence": 0.88
+      }
+    ]
+  }
+}

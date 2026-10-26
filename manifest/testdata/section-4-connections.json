@@ -1,0 +1,38 @@
+{
+  "connections": [
+    {
+      "kind": "subscription",
+      "label": "Claude plan (via claude CLI)",
+      "billing": "subscription",
+      "description": "Uses the claude CLI signed in with your own Claude account.",
+      "config": {
+        "type": "object",
+        "properties": {
+          "loadProjectSettings": {
+            "type": "boolean",
+            "default": false,
+            "title": "Load the project's own Claude settings (hooks, .mcp.json)"
+          }
+        }
+      },
+      "secrets": []
+    },
+    {
+      "kind": "api_key",
+      "label": "Claude API key",
+      "billing": "api",
+      "config": {
+        "type": "object",
+        "properties": {}
+      },
+      "secrets": [
+        {
+          "id": "apiKey",
+          "label": "Anthropic API key",
+          "pattern": "^sk-ant-",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

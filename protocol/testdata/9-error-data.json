@@ -1,0 +1,7 @@
+{
+  "code": "rate_limited",
+  "retryable": true,
+  "resetsAt": "2026-10-25T18:40:00Z",
+  "windowId": "five_hour",
+  "message": "5-hour window exhausted"
+}
