@@ -22,7 +22,7 @@ func readTestdata(t *testing.T, name string) []byte {
 }
 
 func TestSection32RoundTrip(t *testing.T) {
-	for _, name := range []string{"section-3.2.json", "section-3.2-command-entry.json", "section-4-connections.json", "valid-claude.json"} {
+	for _, name := range []string{"section-3.2.json", "section-3.2-command-entry.json", "section-4-connections.json", "section-16.1.json", "valid-claude.json"} {
 		raw := readTestdata(t, name)
 		m, err := Load(bytesReader(raw))
 		if err != nil {

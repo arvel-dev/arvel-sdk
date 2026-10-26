@@ -104,20 +104,3 @@ func (r DiscoverResult) Validate() error {
 	}
 	return errors.Join(errs...)
 }
-
-// InteractiveResult is the result of _arvel/interactive (PROTOCOL §7.8).
-type InteractiveResult struct {
-	SessionID string            `json:"sessionId"`
-	Command   []string          `json:"command"`
-	Env       map[string]string `json:"env,omitempty"`
-	Cwd       string            `json:"cwd,omitempty"`
-	Observe   bool              `json:"observe,omitempty"`
-}
-
-// Validate checks the session id and command.
-func (r InteractiveResult) Validate() error {
-	if r.SessionID == "" || len(r.Command) == 0 {
-		return errors.New("protocol: interactive result needs sessionId and command")
-	}
-	return nil
-}

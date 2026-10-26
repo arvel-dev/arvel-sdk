@@ -10,7 +10,7 @@ import (
 // PluginAPI is the major version of the protocol, sent as "pluginApi".
 const PluginAPI = "1"
 
-// Arvel extension methods (PROTOCOL §6, §7.8, §7.9, §14).
+// Arvel extension methods (PROTOCOL §6, §7.9, §14).
 const (
 	MethodStatus        = "_arvel/status"
 	MethodModels        = "_arvel/models"
@@ -20,7 +20,6 @@ const (
 	MethodStatusChanged = "_arvel/status_changed"
 	MethodShutdown      = "_arvel/shutdown"
 	MethodDiscover      = "_arvel/discover"
-	MethodInteractive   = "_arvel/interactive"
 	MethodRoutePlan     = "_arvel/route/plan"
 	MethodRouteMessage  = "_arvel/route/message"
 	MethodRouteEffort   = "_arvel/route/effort"
@@ -39,7 +38,8 @@ const (
 	MethodSessionRequestPermission = "session/request_permission"
 )
 
-// Feature names listed in InitResultMeta.Features.
+// Feature names listed in InitResultMeta.Features. "_arvel/interactive" and
+// the feature "interactive" are reserved (PROTOCOL §7.8) and have no constant.
 const (
 	FeatureStatus       = "status"
 	FeatureModels       = "models"
@@ -48,7 +48,6 @@ const (
 	FeatureSubagents    = "subagents"
 	FeatureResume       = "resume"
 	FeatureSkills       = "skills"
-	FeatureInteractive  = "interactive"
 	FeatureDiscover     = "discover"
 	FeatureRoutePlan    = "route.plan"
 	FeatureRouteMessage = "route.message"

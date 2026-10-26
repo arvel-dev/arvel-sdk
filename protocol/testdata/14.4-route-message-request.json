@@ -6,19 +6,19 @@
       "language": "ru"
     },
     "message": "The signature test still fails, take a look",
-    "currentRoleId": "r_review",
+    "currentRoleId": "reviewer",
     "candidates": [
       {
-        "roleId": "r_dev",
+        "roleId": "developer",
         "name": "Developer",
         "description": "…",
         "kind": "code"
       },
       {
-        "roleId": "r_review",
+        "roleId": "reviewer",
         "name": "Reviewer",
         "description": "…",
-        "kind": "review"
+        "kind": "check"
       }
     ]
   }

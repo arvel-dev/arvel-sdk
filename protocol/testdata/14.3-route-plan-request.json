@@ -11,58 +11,92 @@
       ],
       "language": "ru"
     },
-    "steps": [
+    "types": [
       {
-        "stepId": "s1",
-        "roleId": "r_analyst",
-        "name": "Analyst",
-        "description": "Turns a long spec into requirements…",
-        "kind": "spec",
-        "participation": "if_needed"
+        "typeId": "feature",
+        "name": "Feature",
+        "description": "One change with code, the full role chain",
+        "roles": {
+          "lead_intake": "on",
+          "architect": "on",
+          "developer": "on",
+          "reviewer": "on",
+          "security": "auto",
+          "tester": "on",
+          "lead_accept": "on"
+        }
       },
       {
-        "stepId": "s2",
-        "roleId": "r_architect",
-        "name": "Architect",
-        "description": "Plans changes that touch several modules…",
-        "kind": "plan",
-        "participation": "usually"
+        "typeId": "bug",
+        "name": "Bug",
+        "description": "Diagnosis and fix",
+        "roles": {
+          "developer": "on",
+          "reviewer": "on",
+          "security": "auto",
+          "tester": "on",
+          "lead_accept": "on"
+        }
       },
       {
-        "stepId": "s3",
-        "roleId": "r_dev",
-        "name": "Developer",
-        "description": "Writes code by the plan…",
-        "kind": "code",
-        "participation": "always"
-      },
-      {
-        "stepId": "s4",
-        "roleId": "r_review",
-        "name": "Reviewer",
-        "description": "…",
-        "kind": "review",
-        "participation": "always"
-      },
-      {
-        "stepId": "s5",
-        "roleId": "r_test",
-        "name": "Tester",
-        "description": "Runs tests and browser checks…",
-        "kind": "verify",
-        "participation": "usually"
+        "typeId": "analysis",
+        "name": "Analysis",
+        "description": "An answer without changes",
+        "roles": {
+          "lead_intake": "on",
+          "architect": "optional"
+        }
       }
     ],
-    "presets": [
+    "roles": [
       {
-        "presetId": "p_bug",
-        "name": "Bug",
-        "description": "Diagnosis, fix, verification"
+        "slot": "lead_intake",
+        "roleId": "lead",
+        "name": "Lead · intake",
+        "description": "Turns the request into requirements and acceptance criteria…",
+        "kind": "intake"
       },
       {
-        "presetId": "p_review",
-        "name": "Review only",
-        "description": "Read-only review"
+        "slot": "architect",
+        "roleId": "architect",
+        "name": "Architect",
+        "description": "Plans changes that touch several modules…",
+        "kind": "plan"
+      },
+      {
+        "slot": "developer",
+        "roleId": "developer",
+        "name": "Developer",
+        "description": "Writes code by the plan…",
+        "kind": "code"
+      },
+      {
+        "slot": "reviewer",
+        "roleId": "reviewer",
+        "name": "Reviewer",
+        "description": "…",
+        "kind": "check"
+      },
+      {
+        "slot": "security",
+        "roleId": "security",
+        "name": "Security",
+        "description": "Checks auth, payments, secrets…",
+        "kind": "check"
+      },
+      {
+        "slot": "tester",
+        "roleId": "tester",
+        "name": "Tester",
+        "description": "Runs tests and browser checks…",
+        "kind": "check"
+      },
+      {
+        "slot": "lead_accept",
+        "roleId": "lead",
+        "name": "Lead · acceptance",
+        "description": "Checks the result, commits and pushes…",
+        "kind": "accept"
       }
     ]
   }

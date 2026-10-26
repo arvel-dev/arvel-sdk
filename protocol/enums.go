@@ -243,28 +243,6 @@ func AllSandboxModes() []SandboxMode {
 	return []SandboxMode{SandboxModeOS, SandboxModeContainer, SandboxModeNone}
 }
 
-// InteractiveState is the idle/busy state of an interactive session (PROTOCOL §7.8).
-type InteractiveState string
-
-const (
-	InteractiveStateIdle InteractiveState = "idle"
-	InteractiveStateBusy InteractiveState = "busy"
-)
-
-// Valid reports whether v is a defined InteractiveState value.
-func (v InteractiveState) Valid() bool {
-	switch v {
-	case InteractiveStateIdle, InteractiveStateBusy:
-		return true
-	}
-	return false
-}
-
-// AllInteractiveStates returns every defined InteractiveState value in protocol order.
-func AllInteractiveStates() []InteractiveState {
-	return []InteractiveState{InteractiveStateIdle, InteractiveStateBusy}
-}
-
 // DiscoverKind is a kind of discoverable item (PROTOCOL §7.9).
 type DiscoverKind string
 
@@ -332,58 +310,54 @@ func AllMcpTransports() []McpTransport {
 	return []McpTransport{McpTransportStdio, McpTransportHTTP, McpTransportSSE}
 }
 
-// WorkKind is the kind of work of a role step (PROTOCOL §14.2).
-type WorkKind string
+// RoleKind is the kind of a role (PROTOCOL §14.2; "read" is the kind of a
+// read-only plugin role, §16.2).
+type RoleKind string
 
 const (
-	WorkKindSpec      WorkKind = "spec"
-	WorkKindPlan      WorkKind = "plan"
-	WorkKindCode      WorkKind = "code"
-	WorkKindReview    WorkKind = "review"
-	WorkKindVerify    WorkKind = "verify"
-	WorkKindAnswer    WorkKind = "answer"
-	WorkKindKnowledge WorkKind = "knowledge"
+	RoleKindIntake    RoleKind = "intake"
+	RoleKindPlan      RoleKind = "plan"
+	RoleKindCode      RoleKind = "code"
+	RoleKindCheck     RoleKind = "check"
+	RoleKindAccept    RoleKind = "accept"
+	RoleKindKnowledge RoleKind = "knowledge"
+	RoleKindRead      RoleKind = "read"
 )
 
-// Valid reports whether v is a defined WorkKind value.
-func (v WorkKind) Valid() bool {
+// Valid reports whether v is a defined RoleKind value.
+func (v RoleKind) Valid() bool {
 	switch v {
-	case WorkKindSpec, WorkKindPlan, WorkKindCode, WorkKindReview, WorkKindVerify, WorkKindAnswer, WorkKindKnowledge:
+	case RoleKindIntake, RoleKindPlan, RoleKindCode, RoleKindCheck, RoleKindAccept, RoleKindKnowledge, RoleKindRead:
 		return true
 	}
 	return false
 }
 
-// AllWorkKinds returns every defined WorkKind value in protocol order.
-func AllWorkKinds() []WorkKind {
-	return []WorkKind{WorkKindSpec, WorkKindPlan, WorkKindCode, WorkKindReview, WorkKindVerify, WorkKindAnswer, WorkKindKnowledge}
+// AllRoleKinds returns every defined RoleKind value in protocol order.
+func AllRoleKinds() []RoleKind {
+	return []RoleKind{RoleKindIntake, RoleKindPlan, RoleKindCode, RoleKindCheck, RoleKindAccept, RoleKindKnowledge, RoleKindRead}
 }
 
-// Participation tells how often a step takes part in a task (PROTOCOL §14.3).
-type Participation string
+// SlotState is a role's default in a task type (PROTOCOL §14.3, §16.3).
+type SlotState string
 
 const (
-	ParticipationAlways   Participation = "always"
-	ParticipationUsually  Participation = "usually"
-	ParticipationIfNeeded Participation = "if_needed"
+	SlotStateOn       SlotState = "on"
+	SlotStateOff      SlotState = "off"
+	SlotStateAuto     SlotState = "auto"
+	SlotStateOptional SlotState = "optional"
 )
 
-// Valid reports whether v is a defined Participation value.
-func (v Participation) Valid() bool {
+// Valid reports whether v is a defined SlotState value.
+func (v SlotState) Valid() bool {
 	switch v {
-	case ParticipationAlways, ParticipationUsually, ParticipationIfNeeded:
+	case SlotStateOn, SlotStateOff, SlotStateAuto, SlotStateOptional:
 		return true
 	}
 	return false
 }
 
-// AllParticipations returns every defined Participation value in protocol order.
-func AllParticipations() []Participation {
-	return []Participation{ParticipationAlways, ParticipationUsually, ParticipationIfNeeded}
-}
-
-// Decidable reports whether a router may decide about a step with this
-// participation: only "usually" and "if_needed" steps are decidable.
-func (p Participation) Decidable() bool {
-	return p == ParticipationUsually || p == ParticipationIfNeeded
+// AllSlotStates returns every defined SlotState value in protocol order.
+func AllSlotStates() []SlotState {
+	return []SlotState{SlotStateOn, SlotStateOff, SlotStateAuto, SlotStateOptional}
 }

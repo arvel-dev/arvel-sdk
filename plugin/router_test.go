@@ -82,7 +82,7 @@ func TestRunRouter_NoFeatureIsError(t *testing.T) {
 func TestRunRouter_SessionMethodsAreMethodNotFound(t *testing.T) {
 	h := readyRouter(t, routerAll{newStubRouter(t)})
 	for _, m := range []string{protocol.MethodSessionNew, protocol.MethodSessionLoad, protocol.MethodSessionPrompt,
-		protocol.MethodSessionSetConfigOption, protocol.MethodModels, protocol.MethodUsage, protocol.MethodAction, protocol.MethodDiscover} {
+		protocol.MethodSessionSetConfigOption, "_arvel/interactive", protocol.MethodModels, protocol.MethodUsage, protocol.MethodAction, protocol.MethodDiscover} {
 		if err := h.call(m, map[string]any{}, nil); rpcCode(err) != protocol.CodeMethodNotFound {
 			t.Errorf("%s: %v, want -32601", m, err)
 		}
@@ -132,29 +132,34 @@ func TestRoute_InvalidResultsBecomeInternal(t *testing.T) {
 		params json.RawMessage
 		setup  func(r *stubRouter)
 	}{
-		{"unknown_step", protocol.MethodRoutePlan, plan, func(r *stubRouter) {
+		{"unknown_slot", protocol.MethodRoutePlan, plan, func(r *stubRouter) {
 			r.plan = func(context.Context, protocol.RoutePlanParams) (protocol.RoutePlanResult, error) {
-				return protocol.RoutePlanResult{Steps: []protocol.StepDecision{{StepID: "zzz", Include: true, Confidence: 0.5}}}, nil
+				return protocol.RoutePlanResult{Roles: []protocol.RoleDecision{{Slot: "zzz", Include: true, Confidence: 0.5}}}, nil
 			}
 		}},
-		{"unknown_preset", protocol.MethodRoutePlan, plan, func(r *stubRouter) {
+		{"unknown_type", protocol.MethodRoutePlan, plan, func(r *stubRouter) {
 			r.plan = func(context.Context, protocol.RoutePlanParams) (protocol.RoutePlanResult, error) {
-				return protocol.RoutePlanResult{Preset: &protocol.PresetDecision{PresetID: "nope", Confidence: 0.5}}, nil
+				return protocol.RoutePlanResult{Type: &protocol.TypeDecision{TypeID: "nope", Confidence: 0.5}}, nil
 			}
 		}},
 		{"confidence_above_one", protocol.MethodRoutePlan, plan, func(r *stubRouter) {
 			r.plan = func(context.Context, protocol.RoutePlanParams) (protocol.RoutePlanResult, error) {
-				return protocol.RoutePlanResult{Steps: []protocol.StepDecision{{StepID: "s1", Include: true, Confidence: 1.5}}}, nil
+				return protocol.RoutePlanResult{Roles: []protocol.RoleDecision{{Slot: "tester", Include: true, Confidence: 1.5}}}, nil
 			}
 		}},
 		{"confidence_nan", protocol.MethodRoutePlan, plan, func(r *stubRouter) {
 			r.plan = func(context.Context, protocol.RoutePlanParams) (protocol.RoutePlanResult, error) {
-				return protocol.RoutePlanResult{Steps: []protocol.StepDecision{{StepID: "s1", Include: true, Confidence: math.NaN()}}}, nil
+				return protocol.RoutePlanResult{Roles: []protocol.RoleDecision{{Slot: "tester", Include: true, Confidence: math.NaN()}}}, nil
+			}
+		}},
+		{"duplicate_slot", protocol.MethodRoutePlan, plan, func(r *stubRouter) {
+			r.plan = func(context.Context, protocol.RoutePlanParams) (protocol.RoutePlanResult, error) {
+				return protocol.RoutePlanResult{Roles: []protocol.RoleDecision{{Slot: "tester"}, {Slot: "tester"}}}, nil
 			}
 		}},
 		{"role_not_in_candidates", protocol.MethodRouteMessage, msg, func(r *stubRouter) {
 			r.message = func(context.Context, protocol.RouteMessageParams) (protocol.RouteMessageResult, error) {
-				return protocol.RouteMessageResult{RoleID: "r_ghost", Confidence: 0.9}, nil
+				return protocol.RouteMessageResult{RoleID: "ghost", Confidence: 0.9}, nil
 			}
 		}},
 		{"effort_not_in_levels", protocol.MethodRouteEffort, eff, func(r *stubRouter) {
@@ -189,7 +194,7 @@ func TestRoute_InvalidResultsBecomeInternal(t *testing.T) {
 	}
 }
 
-func TestRoute_ValidResultWithNullPreset(t *testing.T) {
+func TestRoute_ValidResultWithNullType(t *testing.T) {
 	r := newStubRouter(t)
 	r.plan = func(context.Context, protocol.RoutePlanParams) (protocol.RoutePlanResult, error) {
 		return protocol.RoutePlanResult{}, nil
@@ -199,8 +204,35 @@ func TestRoute_ValidResultWithNullPreset(t *testing.T) {
 	if err := h.call(protocol.MethodRoutePlan, golden(t, "14.3-route-plan-request.json", "/params"), &got); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(got), `"preset":null`) {
-		t.Fatalf("result = %s", got)
+	mustEqualJSON(t, json.RawMessage(`{"type":null,"roles":[]}`), got)
+}
+
+func TestRoute_IgnoredDecisionsAreDroppedAndLogged(t *testing.T) {
+	r := newStubRouter(t)
+	r.plan = func(context.Context, protocol.RoutePlanParams) (protocol.RoutePlanResult, error) {
+		return protocol.RoutePlanResult{
+			Type: &protocol.TypeDecision{TypeID: "bug", Confidence: 0.8},
+			Roles: []protocol.RoleDecision{
+				{Slot: "security", Include: true, Confidence: 0.9},
+				{Slot: "lead_accept", Include: false, Confidence: 0.9},
+				{Slot: "tester", Include: true, Confidence: 0.7},
+			},
+		}, nil
+	}
+	h := readyRouter(t, routerAll{r})
+	var got protocol.RoutePlanResult
+	if err := h.call(protocol.MethodRoutePlan, golden(t, "14.3-route-plan-request.json", "/params"), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Roles) != 1 || got.Roles[0].Slot != "tester" {
+		t.Fatalf("roles = %+v, want only tester", got.Roles)
+	}
+	logs := h.stderr.find(t, "router decision ignored")
+	if len(logs) != 2 || logs[0]["path"] != "roles[0].slot" || logs[1]["path"] != "roles[1].slot" {
+		t.Fatalf("logs = %v", logs)
+	}
+	if n := len(h.stderr.find(t, "router returned an invalid result")); n != 0 {
+		t.Fatalf("ignored decisions must not be violations (%d)", n)
 	}
 }
 

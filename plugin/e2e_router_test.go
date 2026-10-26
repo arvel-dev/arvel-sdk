@@ -46,19 +46,28 @@ func TestE2E_RouterConversation(t *testing.T) {
 	}
 }
 
-// randomRoster builds a plan request with 1-12 steps and 0-3 presets.
+// randomRoster builds a plan request with 1-3 types over 1-12 roles: the
+// slots of the fixed order first, then plugin slots.
 func randomRoster(rng *rand.Rand) protocol.RoutePlanParams {
-	kinds := protocol.AllWorkKinds()
-	parts := protocol.AllParticipations()
+	kinds := protocol.AllRoleKinds()
+	states := protocol.AllSlotStates()
 	p := protocol.RoutePlanParams{Task: protocol.RouteTask{Title: "task", Language: "en"}}
+	order := protocol.Order()
 	for i := range 1 + rng.Intn(12) {
-		p.Steps = append(p.Steps, protocol.RouteStep{
-			StepID: fmt.Sprintf("s%d", i), RoleID: fmt.Sprintf("r%d", i), Name: fmt.Sprintf("Role %d", i),
-			Kind: kinds[rng.Intn(len(kinds))], Participation: parts[rng.Intn(len(parts))],
+		slot := fmt.Sprintf("p:r%d", i)
+		if i < len(order) {
+			slot = order[i]
+		}
+		p.Roles = append(p.Roles, protocol.RouteRole{
+			Slot: slot, RoleID: fmt.Sprintf("r%d", i), Name: fmt.Sprintf("Role %d", i), Kind: kinds[rng.Intn(len(kinds))],
 		})
 	}
-	for i := range rng.Intn(4) {
-		p.Presets = append(p.Presets, protocol.RoutePreset{PresetID: fmt.Sprintf("p%d", i), Name: fmt.Sprintf("Preset %d", i)})
+	for i := range 1 + rng.Intn(3) {
+		t := protocol.RouteType{TypeID: fmt.Sprintf("t%d", i), Name: fmt.Sprintf("Type %d", i), Roles: map[string]protocol.SlotState{}}
+		for _, r := range p.Roles {
+			t.Roles[r.Slot] = states[rng.Intn(len(states))]
+		}
+		p.Types = append(p.Types, t)
 	}
 	return p
 }
@@ -66,12 +75,12 @@ func randomRoster(rng *rand.Rand) protocol.RoutePlanParams {
 // validDecisions answers a plan request correctly.
 func validDecisions(rng *rand.Rand, req protocol.RoutePlanParams) protocol.RoutePlanResult {
 	var res protocol.RoutePlanResult
-	if len(req.Presets) > 0 && rng.Intn(2) == 0 {
-		res.Preset = &protocol.PresetDecision{PresetID: req.Presets[rng.Intn(len(req.Presets))].PresetID, Confidence: rng.Float64()}
+	if rng.Intn(2) == 0 {
+		res.Type = &protocol.TypeDecision{TypeID: req.Types[rng.Intn(len(req.Types))].TypeID, Confidence: rng.Float64()}
 	}
-	for _, s := range req.Steps {
-		if s.Participation.Decidable() {
-			res.Steps = append(res.Steps, protocol.StepDecision{StepID: s.StepID, Include: rng.Intn(2) == 0, Confidence: rng.Float64()})
+	for _, r := range req.Roles {
+		if rng.Intn(2) == 0 {
+			res.Roles = append(res.Roles, protocol.RoleDecision{Slot: r.Slot, Include: rng.Intn(2) == 0, Confidence: rng.Float64()})
 		}
 	}
 	return res
@@ -92,6 +101,9 @@ func TestE2E_RouterRandomRosters(t *testing.T) {
 		if err := h.call(protocol.MethodRoutePlan, req, &got); err != nil {
 			t.Fatalf("roster %d: %v", i, err)
 		}
+		if _, ignored := got.Sanitize(req); len(ignored) != 0 {
+			t.Fatalf("roster %d: ignored decisions reached the host: %v", i, ignored)
+		}
 		if err := got.Validate(req); err != nil { // what the host checks
 			t.Fatalf("roster %d: invalid result reached the host: %v", i, err)
 		}
@@ -101,14 +113,14 @@ func TestE2E_RouterRandomRosters(t *testing.T) {
 func TestE2E_RouterViolationsNeverReachTheHost(t *testing.T) {
 	rng := rand.New(rand.NewSource(11))
 	violations := map[string]func(res *protocol.RoutePlanResult, req protocol.RoutePlanParams){
-		"foreign_step_id": func(res *protocol.RoutePlanResult, _ protocol.RoutePlanParams) {
-			res.Steps = append(res.Steps, protocol.StepDecision{StepID: "not-in-request", Confidence: 0.5})
+		"foreign_slot": func(res *protocol.RoutePlanResult, _ protocol.RoutePlanParams) {
+			res.Roles = append(res.Roles, protocol.RoleDecision{Slot: "not-in-request", Confidence: 0.5})
 		},
 		"confidence_two": func(res *protocol.RoutePlanResult, req protocol.RoutePlanParams) {
-			res.Steps = append(res.Steps[:0:0], protocol.StepDecision{StepID: req.Steps[0].StepID, Confidence: 2})
+			res.Roles = append(res.Roles[:0:0], protocol.RoleDecision{Slot: req.Roles[0].Slot, Confidence: 2})
 		},
-		"foreign_preset": func(res *protocol.RoutePlanResult, _ protocol.RoutePlanParams) {
-			res.Preset = &protocol.PresetDecision{PresetID: "not-in-request", Confidence: 0.5}
+		"foreign_type": func(res *protocol.RoutePlanResult, _ protocol.RoutePlanParams) {
+			res.Type = &protocol.TypeDecision{TypeID: "not-in-request", Confidence: 0.5}
 		},
 	}
 	for name, violate := range violations {
@@ -122,9 +134,6 @@ func TestE2E_RouterViolationsNeverReachTheHost(t *testing.T) {
 			h := readyRouter(t, routerAll{r})
 			for i := range 20 {
 				req := randomRoster(rng)
-				if len(req.Steps) == 0 {
-					continue
-				}
 				var got json.RawMessage
 				err := h.call(protocol.MethodRoutePlan, req, &got)
 				if arvelCode(err) != protocol.ErrInternal || got != nil {

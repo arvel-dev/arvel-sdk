@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"unicode/utf8"
 )
 
@@ -21,56 +23,59 @@ type RouteTask struct {
 	Language    string   `json:"language,omitempty"`
 }
 
-// RouteStep is one role step of the team order.
-type RouteStep struct {
-	StepID        string        `json:"stepId"`
-	RoleID        string        `json:"roleId"`
-	Name          string        `json:"name"`
-	Description   string        `json:"description,omitempty"`
-	Kind          WorkKind      `json:"kind"`
-	Participation Participation `json:"participation"`
+// RouteType is a task type the router may choose. Roles maps a slot to its
+// default state in this type; missing slots are "off" (PROTOCOL §14.3).
+type RouteType struct {
+	TypeID      string               `json:"typeId"`
+	Name        string               `json:"name"`
+	Description string               `json:"description,omitempty"`
+	Roles       map[string]SlotState `json:"roles,omitempty"`
 }
 
-// RoutePreset is a named selection of steps.
-type RoutePreset struct {
-	PresetID    string `json:"presetId"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
+// RouteRole is one role in a place of the fixed order. A role added by a
+// plugin has the slot "<pluginId>:<roleId>".
+type RouteRole struct {
+	Slot        string   `json:"slot"`
+	RoleID      string   `json:"roleId"`
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Kind        RoleKind `json:"kind"`
 }
 
 // RoutePlanParams are the params of _arvel/route/plan (and route/explain).
 type RoutePlanParams struct {
-	Task    RouteTask     `json:"task"`
-	Steps   []RouteStep   `json:"steps"`
-	Presets []RoutePreset `json:"presets,omitempty"`
+	Task  RouteTask   `json:"task"`
+	Types []RouteType `json:"types"`
+	Roles []RouteRole `json:"roles"`
 }
 
-// PresetDecision is the router's preset choice.
-type PresetDecision struct {
-	PresetID   string  `json:"presetId"`
+// TypeDecision is the router's choice of a task type.
+type TypeDecision struct {
+	TypeID     string  `json:"typeId"`
 	Confidence float64 `json:"confidence"`
 }
 
-// StepDecision is the router's decision about one decidable step.
-type StepDecision struct {
-	StepID     string  `json:"stepId"`
+// RoleDecision is the router's decision about one slot, relative to the chosen
+// type's defaults.
+type RoleDecision struct {
+	Slot       string  `json:"slot"`
 	Include    bool    `json:"include"`
 	Confidence float64 `json:"confidence"`
 }
 
-// RoutePlanResult is the result of _arvel/route/plan. A nil Preset marshals as
-// null ("no preset fits").
+// RoutePlanResult is the result of _arvel/route/plan. A nil Type marshals as
+// null ("no type fits").
 type RoutePlanResult struct {
-	Preset *PresetDecision `json:"preset"`
-	Steps  []StepDecision  `json:"steps"`
+	Type  *TypeDecision  `json:"type"`
+	Roles []RoleDecision `json:"roles"`
 }
 
-// MarshalJSON always writes "steps" as an array.
+// MarshalJSON always writes "roles" as an array.
 func (r RoutePlanResult) MarshalJSON() ([]byte, error) {
 	type plain RoutePlanResult
 	p := plain(r)
-	if p.Steps == nil {
-		p.Steps = []StepDecision{}
+	if p.Roles == nil {
+		p.Roles = []RoleDecision{}
 	}
 	return json.Marshal(p)
 }
@@ -80,7 +85,7 @@ type RouteCandidate struct {
 	RoleID      string   `json:"roleId"`
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
-	Kind        WorkKind `json:"kind"`
+	Kind        RoleKind `json:"kind"`
 }
 
 // RouteMessageParams are the params of _arvel/route/message.
@@ -102,7 +107,7 @@ type RouteMessageResult struct {
 type RouteEffortParams struct {
 	Text   string   `json:"text"`
 	RoleID string   `json:"roleId"`
-	Kind   WorkKind `json:"kind"`
+	Kind   RoleKind `json:"kind"`
 	Levels []Effort `json:"levels"`
 }
 
@@ -123,39 +128,58 @@ type RouteExplainResult struct {
 	Lines []ExplainLine `json:"lines"`
 }
 
+// MarshalJSON always writes "lines" as an array.
+func (r RouteExplainResult) MarshalJSON() ([]byte, error) {
+	type plain RouteExplainResult
+	p := plain(r)
+	if p.Lines == nil {
+		p.Lines = []ExplainLine{}
+	}
+	return json.Marshal(p)
+}
+
 func checkDescription(errs *[]error, path, desc string) {
 	if utf8.RuneCountInString(desc) > MaxRoleDescriptionLen {
 		*errs = append(*errs, fmt.Errorf("protocol: %s.description is longer than %d characters", path, MaxRoleDescriptionLen))
 	}
 }
 
-// Validate checks the request the host builds: unique ids, valid enums and
-// description lengths (PROTOCOL §14.2, §14.3).
+// Validate checks the request the host builds: unique ids and slots, valid
+// enums and description lengths (PROTOCOL §14.2, §14.3).
 func (p RoutePlanParams) Validate() error {
 	var errs []error
-	steps := map[string]bool{}
-	for i, s := range p.Steps {
-		path := fmt.Sprintf("steps[%d]", i)
-		if s.StepID == "" || steps[s.StepID] {
-			errs = append(errs, fmt.Errorf("protocol: %s.stepId is empty or duplicated", path))
+	types := map[string]bool{}
+	for i, t := range p.Types {
+		path := fmt.Sprintf("types[%d]", i)
+		if t.TypeID == "" || types[t.TypeID] {
+			errs = append(errs, fmt.Errorf("protocol: %s.typeId is empty or duplicated", path))
 		}
-		steps[s.StepID] = true
-		if !s.Kind.Valid() {
-			errs = append(errs, fmt.Errorf("protocol: %s.kind %q is not valid", path, s.Kind))
+		types[t.TypeID] = true
+		checkDescription(&errs, path, t.Description)
+		for _, slot := range slices.Sorted(maps.Keys(t.Roles)) {
+			st := t.Roles[slot]
+			if slot == "" {
+				errs = append(errs, fmt.Errorf("protocol: %s.roles has an empty slot", path))
+			}
+			if !st.Valid() {
+				errs = append(errs, fmt.Errorf("protocol: %s.roles[%q] state %q is not valid", path, slot, st))
+			}
 		}
-		if !s.Participation.Valid() {
-			errs = append(errs, fmt.Errorf("protocol: %s.participation %q is not valid", path, s.Participation))
-		}
-		checkDescription(&errs, path, s.Description)
 	}
-	presets := map[string]bool{}
-	for i, pr := range p.Presets {
-		path := fmt.Sprintf("presets[%d]", i)
-		if pr.PresetID == "" || presets[pr.PresetID] {
-			errs = append(errs, fmt.Errorf("protocol: %s.presetId is empty or duplicated", path))
+	slots := map[string]bool{}
+	for i, r := range p.Roles {
+		path := fmt.Sprintf("roles[%d]", i)
+		if r.Slot == "" || slots[r.Slot] {
+			errs = append(errs, fmt.Errorf("protocol: %s.slot is empty or duplicated", path))
 		}
-		presets[pr.PresetID] = true
-		checkDescription(&errs, path, pr.Description)
+		slots[r.Slot] = true
+		if r.RoleID == "" {
+			errs = append(errs, fmt.Errorf("protocol: %s.roleId is empty", path))
+		}
+		if !r.Kind.Valid() {
+			errs = append(errs, fmt.Errorf("protocol: %s.kind %q is not valid", path, r.Kind))
+		}
+		checkDescription(&errs, path, r.Description)
 	}
 	return errors.Join(errs...)
 }

@@ -1,0 +1,100 @@
+{
+  "id": "godot",
+  "name": "Godot",
+  "type": "integration",
+  "version": "0.3.0",
+  "pluginApi": "1",
+  "description": "Godot scenes for Arvel agents: an MCP server, skills and the «Game scene» task type.",
+  "entry": {
+    "darwin-arm64": {
+      "asset": "arvel-plugin-godot_darwin_arm64.tar.gz",
+      "bin": "godot-mcp"
+    }
+  },
+  "checksums": "checksums.txt",
+  "permissions": {
+    "spawn": [
+      "godot"
+    ],
+    "network": [],
+    "files": "session-cwd"
+  },
+  "contributes": {
+    "roles": [
+      {
+        "id": "scene-designer",
+        "name": {
+          "en": "Scene designer",
+          "ru": "Дизайнер сцен"
+        },
+        "description": {
+          "en": "Builds and checks Godot scenes…",
+          "ru": "…"
+        },
+        "kind": "code",
+        "placement": {
+          "after": "developer"
+        },
+        "instructions": {
+          "en": "roles/scene-designer.en.md",
+          "ru": "roles/scene-designer.ru.md"
+        },
+        "permissions": {
+          "read": "allow",
+          "edit": "allow",
+          "commands": {
+            "default": "ask",
+            "allow": [
+              "godot --headless *"
+            ]
+          },
+          "network": "ask"
+        },
+        "icon": "palette"
+      }
+    ],
+    "taskTypes": [
+      {
+        "id": "game-scene",
+        "name": {
+          "en": "Game scene",
+          "ru": "Игровая сцена"
+        },
+        "description": {
+          "en": "A scene, its scripts and a screenshot check",
+          "ru": "…"
+        },
+        "roles": {
+          "lead_intake": "on",
+          "architect": "on",
+          "developer": "on",
+          "security": "auto",
+          "lead_accept": "on",
+          "godot:scene-designer": "on"
+        },
+        "branch": "new",
+        "result": "code"
+      }
+    ],
+    "mcpServers": [
+      {
+        "name": "godot",
+        "command": [
+          "{bin}",
+          "--stdio"
+        ],
+        "tools": [
+          "scene_tree",
+          "run_scene",
+          "screenshot"
+        ]
+      }
+    ],
+    "skills": [
+      {
+        "name": "godot-scenes",
+        "path": "skills/godot-scenes"
+      }
+    ]
+  }
+}

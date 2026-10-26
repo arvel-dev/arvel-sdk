@@ -60,10 +60,10 @@ func TestPermissionMetaValidate(t *testing.T) {
 }
 
 func TestUpdateMetaAndTurnMeta(t *testing.T) {
-	u := UpdateMeta{Subagent: &SubagentMeta{ID: "s", ParentToolCallID: "t", Label: "Explore"}, Interactive: true, State: InteractiveStateIdle}
+	u := UpdateMeta{Subagent: &SubagentMeta{ID: "s", ParentToolCallID: "t", Label: "Explore"}}
 	b, _ := json.Marshal(u)
 	var u2 UpdateMeta
-	if err := json.Unmarshal(b, &u2); err != nil || *u2.Subagent != *u.Subagent || u2.State != InteractiveStateIdle || !u2.Interactive {
+	if err := json.Unmarshal(b, &u2); err != nil || *u2.Subagent != *u.Subagent {
 		t.Fatalf("update round trip: %s %v", b, err)
 	}
 	tm := TurnMeta{
@@ -130,11 +130,55 @@ func TestDiscoverResultValidate(t *testing.T) {
 	}
 }
 
-func TestInteractiveResultValidate(t *testing.T) {
-	if err := (InteractiveResult{SessionID: "s", Command: []string{"claude"}}).Validate(); err != nil {
+func TestSessionMetaTaskValidate(t *testing.T) {
+	ok := SessionMeta{Task: &TaskMeta{Number: 42, Type: "feature"}}
+	if err := ok.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if (InteractiveResult{Command: []string{"x"}}).Validate() == nil || (InteractiveResult{SessionID: "s"}).Validate() == nil {
-		t.Fatal("want errors")
+	for name, task := range map[string]*TaskMeta{
+		"negative number": {Number: -1, Type: "feature"},
+		"empty type":      {Number: 1},
+	} {
+		if (SessionMeta{Task: task}).Validate() == nil {
+			t.Errorf("%s: want error", name)
+		}
+	}
+}
+
+func TestNormalize_ReadOnlyForcesDeny(t *testing.T) {
+	cmds := &CommandPolicy{Default: PermissionLevelAsk}
+	for _, tc := range []struct {
+		name string
+		perm *Permissions
+	}{
+		{"no permissions", nil},
+		{"allow", &Permissions{Edit: PermissionLevelAllow, Commands: cmds}},
+		{"ask", &Permissions{Edit: PermissionLevelAsk}},
+		{"deny", &Permissions{Edit: PermissionLevelDeny}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var before PermissionLevel
+			if tc.perm != nil {
+				before = tc.perm.Edit
+			}
+			m := SessionMeta{Task: &TaskMeta{Type: "review", ReadOnly: true}, Permissions: tc.perm}
+			got := m.Normalize()
+			if got.Permissions == nil || got.Permissions.Edit != PermissionLevelDeny {
+				t.Fatalf("edit not denied: %+v", got.Permissions)
+			}
+			if tc.perm != nil && tc.perm.Edit != before {
+				t.Fatal("receiver was modified")
+			}
+			if tc.perm != nil && tc.perm.Commands != got.Permissions.Commands {
+				t.Fatal("commands policy not preserved")
+			}
+		})
+	}
+	writable := SessionMeta{Task: &TaskMeta{Type: "feature"}, Permissions: &Permissions{Edit: PermissionLevelAllow}}
+	if writable.Normalize().Permissions.Edit != PermissionLevelAllow {
+		t.Fatal("writable task must keep edit")
+	}
+	if (SessionMeta{}).Normalize().Permissions != nil {
+		t.Fatal("no task: unchanged")
 	}
 }

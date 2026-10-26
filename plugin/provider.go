@@ -57,7 +57,7 @@ type Session interface {
 // Output is what a turn writes to.
 type Output interface {
 	// Update sends a session/update notification. meta carries the Arvel
-	// per-update metadata (subagent, interactive, state) and may be nil.
+	// per-update metadata (subagent) and may be nil.
 	Update(u acp.SessionUpdate, meta *protocol.UpdateMeta) error
 	// RequestPermission asks the host and blocks until it answers, the session
 	// is cancelled (then the decision has Cancelled set) or ctx ends. There is

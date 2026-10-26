@@ -31,7 +31,7 @@
           "subagents",
           "resume",
           "skills",
-          "interactive"
+          "discover"
         ],
         "instructionFiles": [
           "CLAUDE.md"

@@ -27,7 +27,8 @@ func (s *providerServer) shuttingDown() error {
 	return &protocol.RPCError{Code: protocol.CodeInvalidRequest, Message: "plugin is shutting down"}
 }
 
-// sessionParams decodes the Arvel metadata of a session request.
+// sessionParams decodes the Arvel metadata of a session request; a read-only
+// task always has edit denied (PROTOCOL §7.1).
 func sessionParams(cwd string, servers []acp.McpServer, meta map[string]any) (SessionParams, error) {
 	m, _, err := protocol.MetaFrom[protocol.SessionMeta](meta)
 	if err != nil {
@@ -36,7 +37,7 @@ func sessionParams(cwd string, servers []acp.McpServer, meta map[string]any) (Se
 	if err := m.Validate(); err != nil {
 		return SessionParams{}, invalidParams("%v", err)
 	}
-	return SessionParams{CWD: cwd, MCPServers: servers, Meta: m}, nil
+	return SessionParams{CWD: cwd, MCPServers: servers, Meta: m.Normalize()}, nil
 }
 
 func (s *providerServer) configOptions(sess Session) []acp.SessionConfigOption {

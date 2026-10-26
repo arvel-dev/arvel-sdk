@@ -35,7 +35,7 @@ func arvelCode(err error) protocol.ErrorCode {
 }
 
 // goldenFeatures returns the features that produce the initialize response of
-// protocol/testdata/5.1 (minus "interactive"); skills and instruction files are
+// protocol/testdata/5.1; skills and instruction files are
 // read from the golden file.
 func goldenFeatures(t *testing.T) Features {
 	meta := goldenAs[protocol.InitResultMeta](t, "5.1-initialize-response.json", "/result/_meta/arvel")
@@ -48,26 +48,19 @@ func goldenFeatures(t *testing.T) Features {
 func TestRun_InitializeGolden(t *testing.T) {
 	p := newStub(t)
 	p.feats = goldenFeatures(t)
-	h := newHarness(t, p)
+	h := newHarness(t, stubDiscoverer{stubProvider: p, discover: func(context.Context, protocol.DiscoverParams) (protocol.DiscoverResult, error) {
+		return protocol.DiscoverResult{}, nil
+	}})
 	var got json.RawMessage
 	if err := h.call("initialize", golden(t, "5.1-initialize-request.json", "/params"), &got); err != nil {
 		t.Fatal(err)
 	}
-	// The golden response names another plugin and announces "interactive",
-	// which the stub does not implement.
+	// The golden response names another plugin.
 	var want map[string]any
 	if err := json.Unmarshal(golden(t, "5.1-initialize-response.json", "/result"), &want); err != nil {
 		t.Fatal(err)
 	}
 	want["agentInfo"] = map[string]any{"name": "stub", "version": "0.0.1"}
-	arvel := want["_meta"].(map[string]any)["arvel"].(map[string]any)
-	var feats []string
-	for _, f := range arvel["features"].([]any) {
-		if f != "interactive" {
-			feats = append(feats, f.(string))
-		}
-	}
-	arvel["features"] = feats
 	wantRaw, _ := json.Marshal(want)
 	if ok, diff := jsoneq.Equal(wantRaw, got); !ok {
 		t.Fatalf("initialize result differs from the golden response:\n%s\n%s", diff, got)
@@ -254,5 +247,12 @@ func TestRun_NilProvider(t *testing.T) {
 	}
 	if err := RunRouter(context.Background(), nil); err == nil {
 		t.Fatal("want an error")
+	}
+}
+
+func TestRun_InteractiveIsMethodNotFound(t *testing.T) {
+	h := readyHarness(t, newStub(t))
+	if err := h.call("_arvel/interactive", map[string]any{}, nil); rpcCode(err) != protocol.CodeMethodNotFound {
+		t.Fatalf("err = %v, want -32601", err)
 	}
 }

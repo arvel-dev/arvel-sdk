@@ -20,6 +20,12 @@
           "id": "developer",
           "name": "Developer"
         },
+        "task": {
+          "number": 42,
+          "code": "SHOP-1287",
+          "type": "feature",
+          "readOnly": false
+        },
         "model": "claude-sonnet-5-5",
         "effort": "medium",
         "instructions": "…role instructions + project rules, already merged by the host…",

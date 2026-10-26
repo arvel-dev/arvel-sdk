@@ -52,16 +52,59 @@ change the Go API; every such change carries a migration note. The protocol
   the vendor CLI's project skills directory, hides them from git and removes them
   when the session ends.
 
+- `protocol`: `TaskMeta` (`task` in `_meta.arvel` of `session/new`), the `RoleKind`
+  and `SlotState` enums, constants for the built-in roles, slots and task types,
+  `Order`, `IsOrderSlot`, `PluginSlot`, and `SessionMeta.Normalize`, which makes a
+  read-only task always deny edits.
+- `protocol`: `RoutePlanResult.Sanitize` drops the decisions the host ignores (auto
+  slots and a type's `lead_accept`) and reports them.
+- `manifest`: plugin types `team` and `integration`, the `contributes` block (roles,
+  task types, MCP servers, skills) with validation, `Manifest.ValidateFiles` for
+  instruction and skill files, and matching rules in `schema/arvel.schema.json`.
+- `plugin`: `RunRouter` drops ignored decisions and logs them at `warn`; `Run` makes
+  sure a read-only task never has edit access.
+- `examples/echo-router` and `examples/team-sample`.
+
 ### Changed
 - `docs/PROTOCOL.md` synced with the workspace sandbox (S7): new §15 Workspace
   sandbox, the manifest `sandbox` block, the `initialize` `sandbox` field, one
   provider process per connection and workspace, provider security rule 6 and the
   conformance note. The change is additive within `pluginApi: "1"`.
+- `docs/PROTOCOL.md` synced with the protocol of 27 October 2026: task types and
+  slots in the router calls, `task` in `session/new`, declarative plugins (§16), no
+  built-in plugins, `git_push` and `pr_open` limited to the lead role.
+- **BREAKING:** the router wire types speak task types and slots. `RouteStep`,
+  `RoutePreset`, `PresetDecision`, `StepDecision`, `WorkKind`, `Participation`,
+  `RoutePlanParams.Steps` and `.Presets`, `RoutePlanResult.Preset` and `.Steps`, and
+  `IssueNotDecidable` are replaced by `RouteType`, `RouteRole`, `TypeDecision`,
+  `RoleDecision`, `RoleKind`, `SlotState`, `RoutePlanParams.Types` and `.Roles`, and
+  `RoutePlanResult.Type` and `.Roles`. Migration: build `types` from the host's task
+  types and `roles` from its slots (a role added by a plugin has the slot
+  `<pluginId>:<roleId>`); answer with a `TypeDecision` and `RoleDecision`s keyed by
+  slot.
+- **BREAKING:** `RouteCandidate.Kind` and `RouteEffortParams.Kind` have the type
+  `RoleKind` (was `WorkKind`). Migration: use `RoleKindCheck` where you used
+  `review` or `verify`, `RoleKindIntake` for `spec`, and `RoleKindAccept` for the
+  lead's acceptance.
+- **BREAKING:** `manifest.PluginType.Valid` also accepts `team` and `integration`,
+  and `Manifest.Entry` and `Manifest.Connections` are omitted from JSON when empty.
+  Migration: none for provider and router manifests.
+- `RoutePlanResult` and `RouteExplainResult` always write their lists as arrays.
+
+### Removed
+- **BREAKING:** interactive terminal sessions: `InteractiveResult`,
+  `InteractiveState` (with `InteractiveStateIdle`, `InteractiveStateBusy` and
+  `AllInteractiveStates`), `MethodInteractive`, `FeatureInteractive`, and the
+  `Interactive` and `State` fields of `UpdateMeta`. The method `_arvel/interactive`
+  and the feature `interactive` are reserved. Migration: delete the code that used
+  them.
+- The manifest type `tool` is rejected; use `integration`.
 
 ### API changes
 - New exported packages `protocol`, `manifest`, `schema`, `jsonl`, `redact`,
-  `logx`, `procx`, `jsonrpc`, `plugin` and `protocol/skills`. All changes are
-  additive; there are no breaking changes.
+  `logx`, `procx`, `jsonrpc`, `plugin` and `protocol/skills`. Except for the items
+  marked **BREAKING:** under Changed and Removed, all changes are additive.
+- New exported API of `protocol` and `manifest` as listed under Added.
 - New dependencies: `github.com/santhosh-tekuri/jsonschema/v6` and
   `golang.org/x/mod` (plus `golang.org/x/text`, which `jsonschema` needs), and
   `golang.org/x/sys` (used only by the Windows code of `procx`).
