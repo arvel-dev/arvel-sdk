@@ -26,7 +26,7 @@ Words **MUST**, **SHOULD**, **MAY** have their RFC 2119 meaning.
 
 | Item | Rule |
 |---|---|
-| Process | One plugin process **per connection** (see §4). The host starts it, keeps it alive, restarts it on crash with exponential backoff (1 s → 30 s, reset after 5 min healthy). One process hosts many ACP sessions. |
+| Process | One provider plugin process **per connection and workspace** (see §4 and §15: the process is the sandbox boundary, so two workspaces never share one). One router plugin process per connection. The host starts it, keeps it alive, restarts it on crash with exponential backoff (1 s → 30 s, reset after 5 min healthy). One process hosts many ACP sessions. |
 | Transport | stdio. **stdin/stdout:** ACP JSON-RPC 2.0, one JSON object per line (`\n`-delimited, UTF-8, no embedded raw newlines). **stderr:** logs only (§10). |
 | Max line | Both sides MUST accept lines up to 64 MiB. |
 | Working directory | Host starts the plugin with cwd = plugin data dir (§3.3). Sessions carry their own `cwd`. |
@@ -85,6 +85,11 @@ Words **MUST**, **SHOULD**, **MAY** have their RFC 2119 meaning.
     "network": ["api.anthropic.com"],
     "files": "session-cwd"
   },
+  "sandbox": {
+    "vendorPaths": { "read": ["~/.claude", "~/.claude.json"], "write": ["~/.claude", "~/.claude.json"] },
+    "vendorHosts": ["api.anthropic.com", "*.anthropic.com", "claude.ai"],
+    "macosKeychain": true
+  },
   "connections": [ /* §4 */ ],
   "capabilities": {
     "usage": "windows+spend",
@@ -107,6 +112,7 @@ Field rules:
 | `checksums` | Release asset with `sha256  filename` lines. Host MUST verify before unpacking. |
 | `requires[]` | External programs the plugin drives. The host shows install hints; the plugin itself re-checks at runtime and reports through `_arvel/status`. |
 | `permissions` | What the plugin may do. `spawn`: binary names it may execute. `network`: hosts it contacts *directly* (not hosts the vendor CLI contacts). `files`: `session-cwd` (default) — only the session cwd and its own data dir. The host shows these on install and shows a **diff** when an update asks for more. |
+| `sandbox` | Providers only. What the vendor CLI needs **outside** the workspace to work at all (§15): its own state paths, the hosts of its own API, macOS keychain access for a stored sign-in. Shown on install and in the update diff. Forbidden in `vendorPaths`: `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, `~/.config/gcloud`, `~/.docker`, browser profiles, `/` and `~` themselves (manifest validation error). |
 | `connections[]` | See §4. At least one. |
 | `capabilities` | Static hints for the UI. The runtime truth is the `initialize` response (§5.1). |
 
@@ -198,7 +204,8 @@ Host → plugin. Standard ACP fields plus `_meta.arvel`:
         },
         "dataDir": "/Users/me/Library/Application Support/Arvel/plugins/claude/data/c_01J...",
         "locale": "ru-RU",
-        "platform": { "os": "darwin", "arch": "arm64", "remote": false }
+        "platform": { "os": "darwin", "arch": "arm64", "remote": false },
+        "sandbox": { "mode": "os", "proxy": "http://127.0.0.1:41234", "workspace": "w_01J…" }
       }
     }
   }
@@ -206,6 +213,7 @@ Host → plugin. Standard ACP fields plus `_meta.arvel`:
 ```
 
 - `clientCapabilities.fs/terminal` are **false**: vendor CLIs use their own file and shell tools inside the session cwd; Arvel controls them through permissions (§7), not by proxying I/O.
+- `sandbox` (§15): `mode` is `os`, `container` or `none`; `proxy` is the only address the process may connect to for the internet. The plugin MUST pass it to the vendor CLI as `HTTPS_PROXY`, `HTTP_PROXY` and `ALL_PROXY`, with `NO_PROXY=localhost,127.0.0.1`.
 - `platform.remote` is `true` when the host runs on a server reached over SSH. Plugins use it to prefer device-code / copy-paste login flows (§6.4).
 
 Plugin → host response:
@@ -574,6 +582,7 @@ When a turn stops for `rate_limited`, the plugin MUST leave the vendor session r
 3. Spawn only binaries listed in `permissions.spawn`; resolve full paths at startup; never use a shell (`sh -c`, `cmd /c`) to start them — except Windows `.cmd`/`.bat` shims, which must be launched with proper argument quoting.
 4. Strip variables that change vendor auth from the vendor env unless the connection sets them deliberately (e.g. remove `ANTHROPIC_API_KEY` for a Claude *subscription* connection, remove `OPENAI_API_KEY` for a ChatGPT connection).
 5. Kill whole process trees (process groups on Unix, Job Objects on Windows).
+6. Never weaken or escape the host's sandbox (§15): no attempts to reach the network around the proxy, no requests for paths outside the sandbox, and never turn off the vendor CLI's own sandbox unless FINDINGS shows it cannot run nested inside the host's sandbox on that OS.
 
 ---
 
@@ -584,7 +593,7 @@ When a turn stops for `rate_limited`, the plugin MUST leave the vendor session r
 
 ## 13. Conformance
 
-`arvel-plugin-check` (in the Arvel SDK, `arvel-sdk/cmd/arvel-plugin-check`) runs a plugin against a scripted mock host and verifies §2–§10 (§14 for routers). A plugin release MUST pass `arvel-plugin-check --level=release` in CI.
+`arvel-plugin-check` (in the Arvel SDK, `arvel-sdk/cmd/arvel-plugin-check`) runs a plugin against a scripted mock host and verifies §2–§10 (§14 for routers), including that the proxy from `sandbox` reaches the vendor CLI's environment (§5.1). A plugin release MUST pass `arvel-plugin-check --level=release` in CI.
 
 ---
 
@@ -603,6 +612,7 @@ Differences:
 - A router MUST NOT implement `session/*` methods; the host never calls them (`-32601` if it does).
 - `capabilities` in the manifest: `{ "router": { "features": [...], "maxLatencyMs": 3000 } }`.
 - `permissions.network` MUST list every host the router contacts. `permissions.spawn` SHOULD be empty.
+- The host runs a router sandboxed like a provider (§15) but with no file access beyond its data dir and with the proxy allowing only `permissions.network`.
 
 ### 14.2 What the host sends (privacy contract)
 
@@ -697,3 +707,81 @@ If `features` includes `route.explain`, the host may call it from the settings "
 ### 14.9 Conformance for routers
 
 `arvel-plugin-check --level release` with a router binary runs the router suite instead of the session suite: manifest `type`, `initialize` < 5 s with empty `agentCapabilities`, `session/new` → `-32601`, every declared `route.*` feature answers the scripted scenarios with ids only from the request and confidences in `[0, 1]`, a canary secret never appears in output, and a request with a 3 s deadline returns or fails in time.
+
+---
+
+## 15. Workspace sandbox (host-enforced)
+
+A workspace is a sandbox. Its purpose is **to protect the computer and the user's data without getting in the way of normal development work**. The host — not the plugin and not the vendor CLI — guarantees it, the same way for every provider. The plugin process, the vendor CLI and every process they start (shell commands, MCP servers over stdio, test runners, dev servers) run inside it.
+
+### 15.0 Levels (per workspace)
+
+| Level | For | Summary |
+|---|---|---|
+| **Обычная** (default) | everyday work | Files and network as in §15.2–§15.3 with the convenient defaults: package registries, documentation and GitHub read-only are allowed without asking; other hosts → ask. Docker and localhost services are opt-in once per workspace. |
+| **Строгая** | unfamiliar code, untrusted repositories | Only the vendor API hosts; every other host is asked; no package caches shared with other workspaces; Docker off. |
+| **Доверенная** | the user's own projects when full freedom is needed | `mode: none` — no OS sandbox, only role rules and vendor controls. A permanent warning chip in the UI. |
+
+On every level (including «Доверенная», as far as role rules can enforce it): agents never write to the main checkout or the main branch, never get the user's git/SSH/cloud credentials, and every result stays in the task branch.
+
+### 15.1 Modes
+
+| `mode` | Where | Mechanism (chosen by spike P9 in the app's M0) |
+|---|---|---|
+| `os` | macOS, Linux (desktop and server); levels «Обычная» and «Строгая» | macOS: Seatbelt profile generated per workspace. Linux: Landlock for files plus a network namespace or seccomp filter that allows only the proxy; `bubblewrap` when available. |
+| `container` | any OS with Docker/Podman; the default for Windows when available | The workspace's dev container (or a generic one) with the projects and worktrees mounted; the network only through the proxy. |
+| `none` | Windows without a container, or the user turned isolation off | Vendor-native controls only (permission rules, the CLI's own sandbox). The UI shows a red «без изоляции» chip on the workspace and on every task. |
+
+### 15.2 Files
+
+- **Read:** the workspace's projects, its task worktrees, the plugin's install and data dirs, `sandbox.vendorPaths.read`, a per-session temp dir, the system and toolchain locations needed to run programs (the host keeps that list per OS: `/usr`, `/opt/homebrew`, SDKs, `~/go`, `~/.nvm`, `~/.composer`, …), and safe user configs (`~/.gitconfig` without credential helpers, `~/.editorconfig`). `~/.npmrc`, `~/.netrc`, `~/.pypirc` and similar token-bearing files are not readable.
+- **Write:** the workspace's worktree root (all tasks of this workspace), the session temp dir, the plugin data dir, `sandbox.vendorPaths.write`, and package caches if the workspace setting «общие кэши пакетов» is on (default on: `~/.npm`, `~/go/pkg/mod`, `~/.cache/go-build`, `~/.composer/cache`, `~/.cache/pip`). The main checkout of a project is read-only for agents.
+- **Always denied**, even under an allowed parent: `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, `~/.config/gcloud`, `~/.docker`, browser profiles, other workspaces' projects and worktrees, Arvel's data dir except the plugin's own, `/var/run/docker.sock` and other container sockets.
+- **Secret files of the project** (`.env*` except `.env.example`/`.env.sample`, `*.pem`, `*.key`, `id_*`, `*.p12`) are denied for reading by default; a role can allow them per project.
+
+### 15.3 Network
+
+- Sandboxed processes can connect only to the host's **egress proxy** (`sandbox.proxy`) and to localhost ports of this workspace's dev servers and of the Arvel MCP server. No direct DNS.
+- The proxy decides by host name (HTTP CONNECT; no TLS interception):
+  1. the plugin's `sandbox.vendorHosts` → always allowed (the CLI must reach its API; the provider's own web search runs there);
+  2. the role's network rule: `allow` → the role's and the workspace's allow-lists apply, plus hosts of the role's enabled HTTP MCP servers; `ask` → an approval `network` with the domain («разрешить для задачи / для роли / всегда в пространстве»), the connection waits up to 60 s; `deny` → refused;
+  3. anything else → refused and shown in the feed as «заблокировано: соединение с example.com».
+- Workspace presets the user can add with one click: package registries (npm, Packagist, Go proxy, PyPI, crates), GitHub read-only (`codeload.github.com`, `raw.githubusercontent.com`), documentation sites.
+
+### 15.3a Local services and Docker
+
+- **Localhost services** (a test database, Redis, a mail catcher): the workspace lists them as `host:port` with a label («тестовая база»). Sandboxed processes may connect to listed ports and to dev servers started inside this workspace. Other local ports are refused.
+- **Docker**: the Docker socket gives root-equivalent access to the machine, so it is **off** by default. A workspace can enable it once («Разрешить Docker — агенты смогут запускать контейнеры, это почти полный доступ к компьютеру»). On «Строгая» it cannot be enabled.
+
+### 15.3b Git
+
+- **Local git works fully** inside the sandbox: status, diff, log, blame, branches, commits in the task branch, stash, rebase of the task branch. The worktree's `.git` link and the project's git object store are readable and writable as git needs; refs of `main` and of other tasks' branches are protected by a host-installed `pre-commit`/`reference-transaction` hook in the worktree (writes to them are rejected).
+- **Remote operations** need credentials, which never enter the sandbox. They are done **by the host** on the agent's request through tools of the Arvel MCP server:
+  - `git_fetch` — fetch from the project's configured remotes (default: allowed);
+  - `git_push` — push **only the task branch** to the project's remote (role permission «Отправка в удалённый репозиторий»: No / Ask / Yes, default Ask; `main` and protected branches are never pushed by agents);
+  - `pr_open` — open a pull request for the task branch via the provider of the remote, if the host has a token for it (role permission, default Ask).
+  A plain `git push` inside the sandbox fails with a clear message («используйте инструмент Arvel git_push»), which the role instructions also say.
+
+### 15.3c Processes and resources
+
+- Sandboxed processes cannot signal or inspect processes outside the sandbox, cannot `sudo`/`su`, and cannot write to system locations (global package installs fail; the agent asks the user instead).
+- On Linux the host puts each workspace into a cgroup with CPU and memory limits (HostSettings); on macOS limits are advisory (the host watches and warns).
+- Disk: the host warns when a workspace's worktrees exceed a configurable size.
+
+### 15.4 Environment and credentials
+
+- The host removes `SSH_AUTH_SOCK`, `GIT_ASKPASS`, `GH_TOKEN`, `GITHUB_TOKEN`, cloud credential variables and git credential helpers from the environment. Remote git goes through the host (§15.3b).
+- `HOME` stays the real home (CLIs need it); the deny list above still applies.
+- macOS keychain access is allowed only if the manifest sets `macosKeychain: true`, and the install dialog says so.
+
+### 15.5 Nested sandboxes
+
+Some vendor CLIs start their own OS sandbox (Codex on every OS, Claude's Bash sandbox). Whether it runs nested inside the host's sandbox is checked per OS in spike P9 and recorded in each plugin's FINDINGS. If it cannot nest, the plugin turns the vendor sandbox off **only** when `sandbox.mode` is `os` or `container`; with `none` it keeps it on.
+
+### 15.6 Violations
+
+The host records every denied file or network access (sandbox log, proxy log) with the session and shows it in the task feed. Repeated attempts to reach denied paths trigger the loop guard (app M6).
+
+### 15.7 What is not sandboxed
+
+The user's own terminal in the Code view, merges done by the host, and the host itself. The UI labels the user's terminal «ваш терминал — без песочницы».
