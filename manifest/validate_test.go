@@ -34,7 +34,7 @@ func find(ps []Problem, code, path string) (Problem, bool) {
 }
 
 func TestValidFixtures(t *testing.T) {
-	for _, name := range []string{"valid-claude.json", "valid-router.json", "valid-command.json"} {
+	for _, name := range []string{"valid-claude.json", "valid-router.json", "valid-command.json", "valid-team.json", "valid-integration.json"} {
 		for _, typed := range []bool{false, true} {
 			m := fixture(t, name, typed)
 			if ps := m.ValidateWith(Options{Official: true}); len(ps) != 0 {
@@ -179,6 +179,12 @@ func TestInvalidFixtures(t *testing.T) {
 		{"invalid-router-sandbox.json", "router-sandbox", "/sandbox"},
 		{"invalid-spawn.json", "spawn-missing", "/requires/0/binary"},
 		{"invalid-config-nested.json", "schema", ""},
+		{"invalid-tool-type.json", "type-tool", "/type"},
+		{"invalid-team-with-entry.json", "schema", ""},
+		{"invalid-role-kind.json", "role-kind-reserved", "/contributes/roles/0/kind"},
+		{"invalid-type-slot.json", "type-slot-unknown", "/contributes/taskTypes/0/roles/other:role"},
+		{"invalid-placement-cycle.json", "placement-cycle", "/contributes/roles/0/placement/after"},
+		{"invalid-instructions-en.json", "locale-en", "/contributes/roles/0/instructions/en"},
 	}
 	for _, c := range cases {
 		ps := fixture(t, c.file, false).ValidateWith(Options{Official: true})
@@ -231,6 +237,9 @@ func TestValidateZeroManifest(t *testing.T) {
 	ps := (&Manifest{}).Validate()
 	if !HasErrors(ps) {
 		t.Fatal("zero manifest must not be valid")
+	}
+	if _, ok := find(ps, "schema", ""); !ok {
+		t.Fatalf("no schema problem in %v", ps)
 	}
 }
 

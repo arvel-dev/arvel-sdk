@@ -1,0 +1,64 @@
+{
+  "id": "team-demo",
+  "name": "Team demo",
+  "type": "team",
+  "version": "0.1.0",
+  "pluginApi": "1",
+  "description": "Demo team plugin.",
+  "checksums": "checksums.txt",
+  "contributes": {
+    "roles": [
+      {
+        "id": "docs-writer",
+        "name": {
+          "en": "Docs writer",
+          "ru": "Автор документации"
+        },
+        "description": {
+          "en": "Writes docs.",
+          "ru": "Пишет документацию."
+        },
+        "kind": "code",
+        "placement": {
+          "after": "tester"
+        },
+        "instructions": {
+          "ru": "roles/docs-writer.ru.md"
+        },
+        "permissions": {
+          "read": "allow",
+          "edit": "ask",
+          "commands": {
+            "default": "ask",
+            "allow": [
+              "git diff *"
+            ]
+          },
+          "network": "deny"
+        },
+        "icon": "book"
+      }
+    ],
+    "taskTypes": [
+      {
+        "id": "docs",
+        "name": {
+          "en": "Docs",
+          "ru": "Документация"
+        },
+        "description": {
+          "en": "Document a change.",
+          "ru": "Описать изменение."
+        },
+        "roles": {
+          "lead_intake": "on",
+          "team-demo:docs-writer": "on",
+          "reviewer": "on",
+          "lead_accept": "on"
+        },
+        "branch": "new",
+        "result": "code"
+      }
+    ]
+  }
+}

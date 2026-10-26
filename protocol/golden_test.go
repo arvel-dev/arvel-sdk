@@ -50,15 +50,14 @@ var examples = []example{
 	{file: "7.1-session-new.json", block: 10, ptr: "/params/_meta/arvel", decode: dec[SessionMeta](), validate: val[SessionMeta]},
 	{file: "7.2-turn-meta.json", block: 11, ptr: "/_meta/arvel", decode: dec[TurnMeta]()},
 	{file: "7.3-request-permission.json", block: 12, ptr: "/params/_meta/arvel", decode: dec[PermissionMeta](), validate: val[PermissionMeta]},
-	{file: "7.8-interactive-result.json", block: 13, decode: dec[InteractiveResult](), validate: val[InteractiveResult]},
-	{file: "7.9-discover-request.json", block: 14, ptr: "/params", decode: dec[DiscoverParams]()},
-	{file: "7.9-discover-result.json", block: 15, ptr: "/result", decode: dec[DiscoverResult](), validate: val[DiscoverResult]},
-	{file: "9-error-data.json", block: 16, decode: dec[ErrorData](), validate: func(v any) error { return v.(*ErrorData).Validate() }},
-	{file: "14.3-route-plan-request.json", block: 17, ptr: "/params", decode: dec[RoutePlanParams](), validate: val[RoutePlanParams]},
-	{file: "14.3-route-plan-result.json", block: 18, ptr: "/result", decode: dec[RoutePlanResult]()},
-	{file: "14.4-route-message-request.json", block: 19, ptr: "/params", decode: dec[RouteMessageParams]()},
-	{file: "14.5-route-effort-request.json", block: 20, ptr: "/params", decode: dec[RouteEffortParams]()},
-	{file: "14.4-route-message-result.json", inline: `{ "roleId": "r_dev", "confidence": 0.82, "probabilities": { "r_dev": 0.82, "r_review": 0.18 } }`, decode: dec[RouteMessageResult]()},
+	{file: "7.9-discover-request.json", block: 13, ptr: "/params", decode: dec[DiscoverParams]()},
+	{file: "7.9-discover-result.json", block: 14, ptr: "/result", decode: dec[DiscoverResult](), validate: val[DiscoverResult]},
+	{file: "9-error-data.json", block: 15, decode: dec[ErrorData](), validate: func(v any) error { return v.(*ErrorData).Validate() }},
+	{file: "14.3-route-plan-request.json", block: 16, ptr: "/params", decode: dec[RoutePlanParams](), validate: val[RoutePlanParams]},
+	{file: "14.3-route-plan-result.json", block: 17, ptr: "/result", decode: dec[RoutePlanResult]()},
+	{file: "14.4-route-message-request.json", block: 18, ptr: "/params", decode: dec[RouteMessageParams]()},
+	{file: "14.5-route-effort-request.json", block: 19, ptr: "/params", decode: dec[RouteEffortParams]()},
+	{file: "14.4-route-message-result.json", inline: `{ "roleId": "developer", "confidence": 0.82, "probabilities": { "developer": 0.82, "reviewer": 0.18 } }`, decode: dec[RouteMessageResult]()},
 	{file: "14.5-route-effort-result.json", inline: `{ "effort": "medium", "confidence": 0.7 }`, decode: dec[RouteEffortResult]()},
 	{file: "14.8-route-explain-result.json", inline: `{ "lines": [ { "text": "…", "value": 0.82 } ] }`, decode: dec[RouteExplainResult]()},
 }
@@ -66,9 +65,10 @@ var examples = []example{
 // manifestBlocks are the examples of PROTOCOL.md that the manifest package
 // binds to its types (manifest/testdata).
 var manifestBlocks = map[int]string{
-	1: "../manifest/testdata/section-3.2.json",
-	2: "../manifest/testdata/section-3.2-command-entry.json",
-	3: "../manifest/testdata/section-4-connections.json",
+	1:  "../manifest/testdata/section-3.2.json",
+	2:  "../manifest/testdata/section-3.2-command-entry.json",
+	3:  "../manifest/testdata/section-4-connections.json",
+	20: "../manifest/testdata/section-16.1.json",
 }
 
 func readFile(t *testing.T, path string) []byte {
@@ -225,6 +225,10 @@ func TestGoldenPlanResultValidatesAgainstRequest(t *testing.T) {
 	if err := res.Validate(req); err != nil {
 		t.Fatal(err)
 	}
+	clean, ignored := res.Sanitize(req)
+	if len(ignored) != 0 || len(clean.Roles) != len(res.Roles) {
+		t.Fatalf("sanitize changed the documented result: %+v %v", clean, ignored)
+	}
 
 	var msgReq RouteMessageParams
 	if err := json.Unmarshal(pick(t, readFile(t, "testdata/14.4-route-message-request.json"), "/params"), &msgReq); err != nil {
@@ -274,5 +278,19 @@ func TestUnknownFieldsIgnored(t *testing.T) {
 	}
 	if s.State != StateReady {
 		t.Fatalf("state = %q", s.State)
+	}
+}
+
+func TestGoldenSessionNewTask(t *testing.T) {
+	var m SessionMeta
+	if err := json.Unmarshal(pick(t, readFile(t, "testdata/7.1-session-new.json"), "/params/_meta/arvel"), &m); err != nil {
+		t.Fatal(err)
+	}
+	want := TaskMeta{Number: 42, Code: "SHOP-1287", Type: "feature", ReadOnly: false}
+	if m.Task == nil || *m.Task != want {
+		t.Fatalf("task = %+v, want %+v", m.Task, want)
+	}
+	if got := m.Normalize().Permissions.Edit; got != PermissionLevelAllow {
+		t.Fatalf("edit = %q, want allow", got)
 	}
 }

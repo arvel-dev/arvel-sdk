@@ -14,24 +14,24 @@ type IssueKind string
 
 const (
 	IssueUnknownID       IssueKind = "unknown_id"
-	IssueNotDecidable    IssueKind = "not_decidable"
 	IssueDuplicate       IssueKind = "duplicate"
 	IssueConfidenceRange IssueKind = "confidence_range"
 	IssueNotInLevels     IssueKind = "not_in_levels"
 	IssueNotFinite       IssueKind = "not_finite"
 	IssueEmpty           IssueKind = "empty"
+	IssueIgnored         IssueKind = "ignored"
 )
 
-// Issue is one violation. Path looks like "steps[2].stepId".
+// Issue is one violation (or, for IssueIgnored, one ignored decision). Path
+// looks like "roles[2].slot".
 type Issue struct {
 	Kind    IssueKind
 	Path    string
 	Message string
 }
 
-// ValidationError lists every violation of a router result. A host that is
-// lenient about some kinds (PROTOCOL §14.3 lets it ignore unknown and "always"
-// steps) can inspect Issues or call Has instead of rejecting the whole result.
+// ValidationError lists every violation of a router result. Decisions the
+// host merely ignores (PROTOCOL §14.3) are not violations; see Sanitize.
 type ValidationError struct {
 	Issues []Issue
 }
@@ -77,34 +77,69 @@ func (is issues) err() error {
 	return &ValidationError{Issues: is}
 }
 
-// Validate checks the result against the request (PROTOCOL §14.3): the preset
-// id exists, decisions name only decidable steps of the request once each,
-// and confidences are in [0, 1].
+// Validate checks the result against the request (PROTOCOL §14.3): the type id
+// exists, decisions name slots of the request once each, and confidences are in
+// [0, 1]. Decisions on auto slots and on a type's lead_accept are not
+// violations: the host ignores them (see Sanitize).
 func (r RoutePlanResult) Validate(req RoutePlanParams) error {
 	var is issues
-	if r.Preset != nil {
-		if !slices.ContainsFunc(req.Presets, func(p RoutePreset) bool { return p.PresetID == r.Preset.PresetID }) {
-			is.add(IssueUnknownID, "preset.presetId", "preset id is not in the request")
+	if r.Type != nil {
+		if !slices.ContainsFunc(req.Types, func(t RouteType) bool { return t.TypeID == r.Type.TypeID }) {
+			is.add(IssueUnknownID, "type.typeId", "type id is not in the request")
 		}
-		is.confidence("preset.confidence", r.Preset.Confidence)
+		is.confidence("type.confidence", r.Type.Confidence)
 	}
 	seen := map[string]bool{}
-	for i, d := range r.Steps {
-		path := fmt.Sprintf("steps[%d]", i)
-		idx := slices.IndexFunc(req.Steps, func(s RouteStep) bool { return s.StepID == d.StepID })
-		switch {
-		case idx < 0:
-			is.add(IssueUnknownID, path+".stepId", "step id is not in the request")
-		case !req.Steps[idx].Participation.Decidable():
-			is.add(IssueNotDecidable, path+".stepId", "step is not decidable")
+	for i, d := range r.Roles {
+		path := fmt.Sprintf("roles[%d]", i)
+		if !slices.ContainsFunc(req.Roles, func(ro RouteRole) bool { return ro.Slot == d.Slot }) {
+			is.add(IssueUnknownID, path+".slot", "slot is not in the request")
 		}
-		if seen[d.StepID] {
-			is.add(IssueDuplicate, path+".stepId", "step id appears twice")
+		if seen[d.Slot] {
+			is.add(IssueDuplicate, path+".slot", "slot appears twice")
 		}
-		seen[d.StepID] = true
+		seen[d.Slot] = true
 		is.confidence(path+".confidence", d.Confidence)
 	}
 	return is.err()
+}
+
+// locked reports whether the type decides the slot itself (PROTOCOL §14.3).
+func locked(t RouteType, slot string) bool {
+	st := t.Roles[slot]
+	return st == SlotStateAuto || (slot == SlotLeadAccept && st == SlotStateOn)
+}
+
+func ignoredSlot(req RoutePlanParams, d *TypeDecision, slot string) bool {
+	if d != nil { // the router named the type: judge against it
+		i := slices.IndexFunc(req.Types, func(t RouteType) bool { return t.TypeID == d.TypeID })
+		return i >= 0 && locked(req.Types[i], slot)
+	}
+	// No type named: the user's type is unknown, so ignore the decision only if
+	// every offered type locks the slot.
+	return len(req.Types) > 0 && !slices.ContainsFunc(req.Types, func(t RouteType) bool { return !locked(t, slot) })
+}
+
+// Sanitize returns a copy of the result without the decisions the host ignores
+// (PROTOCOL §14.3: auto slots and the lead_accept of a type that has it), and
+// one IssueIgnored per dropped decision. It does not check ids or confidences;
+// call Validate first. Neither the result nor the request is modified.
+func (r RoutePlanResult) Sanitize(req RoutePlanParams) (RoutePlanResult, []Issue) {
+	out := RoutePlanResult{Roles: []RoleDecision{}}
+	if r.Type != nil {
+		t := *r.Type
+		out.Type = &t
+	}
+	var dropped []Issue
+	for i, d := range r.Roles {
+		if ignoredSlot(req, r.Type, d.Slot) {
+			dropped = append(dropped, Issue{Kind: IssueIgnored, Path: fmt.Sprintf("roles[%d].slot", i),
+				Message: "decision on an auto or lead_accept slot is ignored"})
+			continue
+		}
+		out.Roles = append(out.Roles, d)
+	}
+	return out, dropped
 }
 
 // Validate checks the result against the request (PROTOCOL §14.4): the role

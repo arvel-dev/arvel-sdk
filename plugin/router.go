@@ -79,7 +79,8 @@ type routerServer struct {
 // initialize, _arvel/status, the route calls of the implemented interfaces and
 // _arvel/shutdown; every other method, including every session/* method, gets
 // -32601. Each route call runs under the route timeout, and its result is
-// validated against its request before it is sent.
+// validated against its request before it is sent. Decisions the host ignores
+// (auto slots, a type's lead_accept) are dropped and logged at warn.
 func RunRouter(ctx context.Context, r Router, opts ...Option) error {
 	if r == nil {
 		return errors.New("plugin: nil router")

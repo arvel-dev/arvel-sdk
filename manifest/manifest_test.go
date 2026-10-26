@@ -137,7 +137,10 @@ func TestPlatformsAndTypes(t *testing.T) {
 	if len(Platforms()) != 6 {
 		t.Fatal("six platforms expected")
 	}
-	if !TypeProvider.Valid() || !TypeRouter.Valid() || PluginType("tool").Valid() {
+	if !TypeProvider.Valid() || !TypeRouter.Valid() || !TypeTeam.Valid() || !TypeIntegration.Valid() || PluginType("tool").Valid() || PluginType("").Valid() {
 		t.Fatal("PluginType.Valid misbehaves")
+	}
+	if !TypeTeam.Declarative() || !TypeIntegration.Declarative() || TypeProvider.Declarative() || TypeRouter.Declarative() {
+		t.Fatal("PluginType.Declarative misbehaves")
 	}
 }

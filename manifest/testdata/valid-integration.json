@@ -1,0 +1,60 @@
+{
+  "id": "godot-demo",
+  "name": "Godot demo",
+  "type": "integration",
+  "version": "0.1.0",
+  "pluginApi": "1",
+  "entry": {
+    "darwin-arm64": {
+      "asset": "arvel-plugin-godot-demo_darwin_arm64.tar.gz",
+      "bin": "godot-mcp"
+    },
+    "darwin-amd64": {
+      "asset": "arvel-plugin-godot-demo_darwin_amd64.tar.gz",
+      "bin": "godot-mcp"
+    },
+    "linux-amd64": {
+      "asset": "arvel-plugin-godot-demo_linux_amd64.tar.gz",
+      "bin": "godot-mcp"
+    },
+    "linux-arm64": {
+      "asset": "arvel-plugin-godot-demo_linux_arm64.tar.gz",
+      "bin": "godot-mcp"
+    },
+    "windows-amd64": {
+      "asset": "arvel-plugin-godot-demo_windows_amd64.zip",
+      "bin": "godot-mcp.exe"
+    },
+    "windows-arm64": {
+      "asset": "arvel-plugin-godot-demo_windows_arm64.zip",
+      "bin": "godot-mcp.exe"
+    }
+  },
+  "checksums": "checksums.txt",
+  "permissions": {
+    "spawn": [
+      "godot"
+    ],
+    "network": []
+  },
+  "contributes": {
+    "mcpServers": [
+      {
+        "name": "godot",
+        "command": [
+          "{bin}",
+          "--stdio"
+        ],
+        "tools": [
+          "scene_tree"
+        ]
+      }
+    ],
+    "skills": [
+      {
+        "name": "godot-scenes",
+        "path": "skills/godot-scenes"
+      }
+    ]
+  }
+}

@@ -2,14 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
   "title": "Arvel plugin manifest",
-  "description": "arvel.json of an Arvel provider or router plugin (Arvel Provider Protocol v1, section 3.2). Unknown fields are allowed outside connection config: readers ignore them.",
+  "description": "arvel.json of an Arvel provider, router, team or integration plugin (Arvel Provider Protocol v1, sections 3.2 and 16). Unknown fields are allowed outside connection config: readers ignore them.",
   "type": "object",
-  "required": ["id", "name", "type", "version", "pluginApi", "entry", "connections"],
+  "required": ["id", "name", "type", "version", "pluginApi"],
   "properties": {
     "$schema": { "type": "string" },
     "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$" },
     "name": { "type": "string", "minLength": 1 },
-    "type": { "enum": ["provider", "router"] },
+    "type": { "enum": ["provider", "router", "team", "integration"] },
     "version": {
       "type": "string",
       "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
@@ -26,10 +26,113 @@
     "permissions": { "$ref": "#/$defs/permissions" },
     "sandbox": { "$ref": "#/$defs/sandbox" },
     "connections": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/connection" } },
-    "capabilities": { "$ref": "#/$defs/capabilities" }
+    "capabilities": { "$ref": "#/$defs/capabilities" },
+    "contributes": { "$ref": "#/$defs/contributes" }
   },
+  "allOf": [
+    {
+      "if": { "required": ["type"], "properties": { "type": { "enum": ["provider", "router"] } } },
+      "then": { "required": ["entry", "connections"] }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "team" } } },
+      "then": {
+        "required": ["contributes"],
+        "not": { "anyOf": [{ "required": ["entry"] }, { "required": ["connections"] }] }
+      }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "integration" } } },
+      "then": { "required": ["contributes"] }
+    }
+  ],
   "$defs": {
     "stringList": { "type": "array", "items": { "type": "string" } },
+    "localized": {
+      "type": "object",
+      "required": ["en"],
+      "properties": { "en": { "type": "string", "minLength": 1 }, "ru": { "type": "string" } },
+      "additionalProperties": { "type": "string" }
+    },
+    "level": { "enum": ["allow", "ask", "deny"] },
+    "rolePermissions": {
+      "type": "object",
+      "properties": {
+        "read": { "$ref": "#/$defs/level" },
+        "edit": { "$ref": "#/$defs/level" },
+        "network": { "$ref": "#/$defs/level" },
+        "commands": {
+          "type": "object",
+          "required": ["default"],
+          "properties": {
+            "default": { "$ref": "#/$defs/level" },
+            "allow": { "$ref": "#/$defs/stringList" },
+            "deny": { "$ref": "#/$defs/stringList" }
+          }
+        },
+        "mcp": {
+          "type": "object",
+          "required": ["default"],
+          "properties": {
+            "default": { "$ref": "#/$defs/level" },
+            "tools": { "type": "object", "additionalProperties": { "$ref": "#/$defs/level" } }
+          }
+        }
+      }
+    },
+    "contributes": {
+      "type": "object",
+      "properties": {
+        "roles": { "type": "array", "items": { "$ref": "#/$defs/role" } },
+        "taskTypes": { "type": "array", "items": { "$ref": "#/$defs/taskType" } },
+        "mcpServers": { "type": "array", "items": { "$ref": "#/$defs/mcpServer" } },
+        "skills": { "type": "array", "items": { "$ref": "#/$defs/skill" } }
+      }
+    },
+    "role": {
+      "type": "object",
+      "required": ["id", "name", "description", "kind", "placement", "instructions"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$" },
+        "name": { "$ref": "#/$defs/localized" },
+        "description": { "$ref": "#/$defs/localized" },
+        "kind": { "enum": ["intake", "plan", "code", "check", "accept", "knowledge", "read"] },
+        "placement": {
+          "type": "object",
+          "properties": { "after": { "type": "string", "minLength": 1 }, "onCall": { "type": "boolean" } }
+        },
+        "instructions": { "$ref": "#/$defs/localized" },
+        "permissions": { "$ref": "#/$defs/rolePermissions" },
+        "icon": { "type": "string" }
+      }
+    },
+    "taskType": {
+      "type": "object",
+      "required": ["id", "name", "description", "roles", "branch", "result"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$" },
+        "name": { "$ref": "#/$defs/localized" },
+        "description": { "$ref": "#/$defs/localized" },
+        "roles": { "type": "object", "additionalProperties": { "enum": ["on", "off", "auto", "optional"] } },
+        "branch": { "enum": ["new", "continue", "view", "ask"] },
+        "result": { "enum": ["code", "report", "subtasks"] }
+      }
+    },
+    "mcpServer": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "command": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "url": { "type": "string", "minLength": 1 },
+        "tools": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "skill": {
+      "type": "object",
+      "required": ["name", "path"],
+      "properties": { "name": { "type": "string", "minLength": 1 }, "path": { "type": "string", "minLength": 1 } }
+    },
     "entryCommand": {
       "type": "object",
       "required": ["command"],

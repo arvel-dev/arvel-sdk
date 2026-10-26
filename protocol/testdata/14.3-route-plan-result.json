@@ -2,25 +2,20 @@
   "jsonrpc": "2.0",
   "id": 7,
   "result": {
-    "preset": {
-      "presetId": "p_bug",
-      "confidence": 0.81
+    "type": {
+      "typeId": "bug",
+      "confidence": 0.84
     },
-    "steps": [
+    "roles": [
       {
-        "stepId": "s1",
+        "slot": "lead_intake",
         "include": false,
-        "confidence": 0.93
+        "confidence": 0.91
       },
       {
-        "stepId": "s2",
-        "include": false,
-        "confidence": 0.77
-      },
-      {
-        "stepId": "s5",
+        "slot": "tester",
         "include": true,
-        "confidence": 0.88
+        "confidence": 0.71
       }
     ]
   }

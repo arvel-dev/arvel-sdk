@@ -75,9 +75,6 @@ func TestEnums(t *testing.T) {
 	t.Run("SandboxMode", func(t *testing.T) {
 		checkEnum(t, []SandboxMode{"os", "container", "none"}, AllSandboxModes())
 	})
-	t.Run("InteractiveState", func(t *testing.T) {
-		checkEnum(t, []InteractiveState{"idle", "busy"}, AllInteractiveStates())
-	})
 	t.Run("DiscoverKind", func(t *testing.T) {
 		checkEnum(t, []DiscoverKind{"mcp", "skills"}, AllDiscoverKinds())
 	})
@@ -87,11 +84,11 @@ func TestEnums(t *testing.T) {
 	t.Run("McpTransport", func(t *testing.T) {
 		checkEnum(t, []McpTransport{"stdio", "http", "sse"}, AllMcpTransports())
 	})
-	t.Run("WorkKind", func(t *testing.T) {
-		checkEnum(t, []WorkKind{"spec", "plan", "code", "review", "verify", "answer", "knowledge"}, AllWorkKinds())
+	t.Run("RoleKind", func(t *testing.T) {
+		checkEnum(t, []RoleKind{"intake", "plan", "code", "check", "accept", "knowledge", "read"}, AllRoleKinds())
 	})
-	t.Run("Participation", func(t *testing.T) {
-		checkEnum(t, []Participation{"always", "usually", "if_needed"}, AllParticipations())
+	t.Run("SlotState", func(t *testing.T) {
+		checkEnum(t, []SlotState{"on", "off", "auto", "optional"}, AllSlotStates())
 	})
 }
 
@@ -100,16 +97,6 @@ func TestAllReturnsFreshSlice(t *testing.T) {
 	a[0] = "mutated"
 	if AllEfforts()[0] != EffortLow {
 		t.Fatal("AllEfforts must return a fresh slice")
-	}
-}
-
-func TestParticipationDecidable(t *testing.T) {
-	for p, want := range map[Participation]bool{
-		ParticipationAlways: false, ParticipationUsually: true, ParticipationIfNeeded: true, "": false,
-	} {
-		if got := p.Decidable(); got != want {
-			t.Errorf("%q.Decidable() = %v, want %v", p, got, want)
-		}
 	}
 }
 

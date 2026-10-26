@@ -10,6 +10,7 @@ import (
 // SessionMeta is "_meta.arvel" of session/new and session/load (PROTOCOL §7.1).
 type SessionMeta struct {
 	Role         *RoleRef     `json:"role,omitempty"`
+	Task         *TaskMeta    `json:"task,omitempty"`
 	Model        string       `json:"model,omitempty"`
 	Effort       Effort       `json:"effort,omitempty"`
 	Instructions string       `json:"instructions,omitempty"`
@@ -25,6 +26,16 @@ type SessionMeta struct {
 type RoleRef struct {
 	ID   string `json:"id"`
 	Name string `json:"name,omitempty"`
+}
+
+// TaskMeta is "_meta.arvel.task" of session/new (PROTOCOL §7.1). It is
+// informative: plugins must not change behaviour by role or task type, except
+// that ReadOnly forbids every file change.
+type TaskMeta struct {
+	Number   int    `json:"number"`
+	Code     string `json:"code,omitempty"`
+	Type     string `json:"type"`
+	ReadOnly bool   `json:"readOnly"`
 }
 
 // Permissions is the role's baseline policy.
@@ -86,11 +97,9 @@ type SubagentMeta struct {
 	Label            string `json:"label,omitempty"`
 }
 
-// UpdateMeta is "_meta.arvel" of session/update.
+// UpdateMeta is "_meta.arvel" of session/update (PROTOCOL §7.2).
 type UpdateMeta struct {
-	Subagent    *SubagentMeta    `json:"subagent,omitempty"`
-	Interactive bool             `json:"interactive,omitempty"`
-	State       InteractiveState `json:"state,omitempty"`
+	Subagent *SubagentMeta `json:"subagent,omitempty"`
 }
 
 // TurnMeta is "_meta.arvel" of the session/prompt result.
@@ -136,6 +145,14 @@ func (m SessionMeta) Validate() error {
 	if b := m.Budget; b != nil && (b.MaxTurns < 0 || b.MaxUSD < 0) {
 		errs = append(errs, errors.New("protocol: budget values must not be negative"))
 	}
+	if t := m.Task; t != nil {
+		if t.Number < 0 {
+			errs = append(errs, errors.New("protocol: task.number is negative"))
+		}
+		if t.Type == "" {
+			errs = append(errs, errors.New("protocol: task.type is empty"))
+		}
+	}
 	for i, s := range m.Skills {
 		if s.Name == "" || s.Path == "" {
 			errs = append(errs, fmt.Errorf("protocol: skills[%d]: name and path are required", i))
@@ -153,4 +170,19 @@ func (p PermissionMeta) Validate() error {
 		return fmt.Errorf("protocol: permission category %q is not valid", p.Category)
 	}
 	return nil
+}
+
+// Normalize applies what a plugin must do whatever the host sent: a read-only
+// task never gets edit access (PROTOCOL §7.1). The receiver is not modified.
+func (m SessionMeta) Normalize() SessionMeta {
+	if m.Task == nil || !m.Task.ReadOnly {
+		return m
+	}
+	var p Permissions
+	if m.Permissions != nil {
+		p = *m.Permissions
+	}
+	p.Edit = PermissionLevelDeny
+	m.Permissions = &p
+	return m
 }

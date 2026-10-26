@@ -31,6 +31,7 @@ var routerFeatures = []string{"route.plan", "route.message", "route.effort", "ro
 
 func (m *Manifest) semanticProblems(opts Options) []Problem {
 	var ps problems
+	m.checkTool(&ps)
 	m.checkVersions(&ps)
 	m.checkEntry(&ps, opts)
 	m.checkRequires(&ps)
@@ -215,13 +216,29 @@ func checkIntegerProperty(bad func(string, ...any), prop ConfigProperty) {
 	}
 }
 
-func (m *Manifest) checkType(ps *problems) {
-	if m.Type != TypeRouter {
-		if m.Capabilities.Router != nil {
-			ps.warn("/capabilities/router", "provider-router-caps", "router capabilities on a provider are ignored")
-		}
-		return
+// checkTool rejects the old "tool" type with a hint (PROTOCOL §3.2).
+func (m *Manifest) checkTool(ps *problems) {
+	if string(m.Type) == "tool" {
+		ps.err("/type", "type-tool", "type \"tool\" was replaced by \"integration\": declare an integration plugin")
 	}
+}
+
+func (m *Manifest) checkType(ps *problems) {
+	if m.Type != TypeRouter && m.Capabilities.Router != nil {
+		ps.warn("/capabilities/router", "provider-router-caps", "router capabilities on a provider are ignored")
+	}
+	if m.Type != TypeRouter && !m.Type.Declarative() && m.Contributes != nil {
+		ps.warn("/contributes", "contributes-ignored", "contributes is used by team and integration plugins only")
+	}
+	switch {
+	case m.Type == TypeRouter:
+		m.checkRouter(ps)
+	case m.Type.Declarative():
+		m.checkDeclarative(ps)
+	}
+}
+
+func (m *Manifest) checkRouter(ps *problems) {
 	r := m.Capabilities.Router
 	if r == nil || len(r.Features) == 0 {
 		ps.err("/capabilities/router/features", "router-features", "a router must list at least one route.* feature")
@@ -248,6 +265,10 @@ func (m *Manifest) checkType(ps *problems) {
 
 func (m *Manifest) checkSandbox(ps *problems) {
 	if m.Sandbox == nil || m.Type == TypeRouter {
+		return
+	}
+	if m.Type.Declarative() {
+		ps.err("/sandbox", "declarative-sandbox", "%s plugins have no sandbox block", m.Type)
 		return
 	}
 	for _, kind := range []struct {

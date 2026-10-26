@@ -6,7 +6,7 @@ status: accepted
 
 # Arvel Provider Protocol — v1
 
-This document is the contract between **Arvel host** (`arvel-host`, the Go core that runs on the user's computer or on their server) and its plugins: **provider plugins** (Claude, ChatGPT, OpenCode, and third-party ones), which run agents, and **router plugins** (§14), which only help decide which roles take part in a task. It is identical in every Arvel repository. If two copies disagree, the copy in `docs/PROTOCOL.md` of the `arvel-sdk` repository wins.
+This document is the contract between **Arvel host** (`arvel-host`, the Go core that runs on the user's computer or on their server) and its plugins: **provider plugins** (Claude, ChatGPT, OpenCode, and third-party ones), which run agents; **router plugins** (§14), which only help decide a task's type and roles; and **declarative plugins** (§16) that add roles, task types, MCP servers or skills. It is identical in every Arvel repository. If two copies disagree, the copy in `docs/PROTOCOL.md` of the `arvel-sdk` repository wins.
 
 Words **MUST**, **SHOULD**, **MAY** have their RFC 2119 meaning.
 
@@ -26,7 +26,7 @@ Words **MUST**, **SHOULD**, **MAY** have their RFC 2119 meaning.
 
 | Item | Rule |
 |---|---|
-| Process | One provider plugin process **per connection and workspace** (see §4 and §15: the process is the sandbox boundary, so two workspaces never share one). One router plugin process per connection. The host starts it, keeps it alive, restarts it on crash with exponential backoff (1 s → 30 s, reset after 5 min healthy). One process hosts many ACP sessions. |
+| Process | One provider plugin process **per connection and workspace** (see §4 and §15: the process is the sandbox boundary, so two workspaces never share one). One router plugin process per connection. `team` plugins have no process; an `integration` plugin's MCP server runs as an MCP server, not as a plugin process (§16.4). The host starts a plugin process, keeps it alive, restarts it on crash with exponential backoff (1 s → 30 s, reset after 5 min healthy). One process hosts many ACP sessions. |
 | Transport | stdio. **stdin/stdout:** ACP JSON-RPC 2.0, one JSON object per line (`\n`-delimited, UTF-8, no embedded raw newlines). **stderr:** logs only (§10). |
 | Max line | Both sides MUST accept lines up to 64 MiB. |
 | Working directory | Host starts the plugin with cwd = plugin data dir (§3.3). Sessions carry their own `cwd`. |
@@ -41,7 +41,7 @@ Words **MUST**, **SHOULD**, **MAY** have their RFC 2119 meaning.
 ### 3.1 Repository and discovery
 
 - GitHub repository named `arvel-plugin-<id>` (recommended, not required).
-- Topics: `arvel-plugin` (required) + exactly one of `arvel-provider`, `arvel-router`, `arvel-tool`, `arvel-integration`.
+- Topics: `arvel-plugin` (required) + exactly one of `arvel-provider`, `arvel-router`, `arvel-team`, `arvel-integration` (matching `type`).
 - `arvel.json` in the repository root **and** attached to every release.
 - Releases are tagged `vMAJOR.MINOR.PATCH` (semver). The host installs only tagged releases, never branches.
 
@@ -106,7 +106,7 @@ Field rules:
 | Field | Rule |
 |---|---|
 | `id` | `^[a-z][a-z0-9-]{1,39}$`, globally unique in the catalog, never changes. |
-| `type` | `provider` (§4–§10) or `router` (§14). (`tool` / `integration` plugins expose MCP servers; out of scope here.) |
+| `type` | `provider` (§4–§10), `router` (§14), `team` (§16: roles and task types, no process) or `integration` (§16: MCP servers and skills for agents, optionally roles and task types). |
 | `pluginApi` | Major version of this protocol as a string: `"1"`. Host refuses other majors. |
 | `entry` | Map `os-arch` → release asset + binary path inside the archive. Missing platform = not installable there; the host shows that. |
 | `checksums` | Release asset with `sha256  filename` lines. Host MUST verify before unpacking. |
@@ -139,7 +139,7 @@ The JSON Schema for `arvel.json` lives in `schema/arvel.schema.json` of the `arv
 <arvel data>/plugins/<id>/data/<connection>/ ← ARVEL_PLUGIN_DATA_DIR (read-write, survives updates)
 ```
 
-`<arvel data>` is `~/Library/Application Support/Arvel` (macOS), `%APPDATA%\Arvel` (Windows), `$XDG_DATA_HOME/arvel` (Linux). Removing a plugin deletes both. **Built-in plugins** are ordinary plugins that ship inside the app bundle and are copied here on first run; the user can disable or remove them, and restore them from Settings.
+`<arvel data>` is `~/Library/Application Support/Arvel` (macOS), `%APPDATA%\Arvel` (Windows), `$XDG_DATA_HOME/arvel` (Linux). Removing a plugin deletes both. Arvel ships **no built-in plugins**: every provider is installed from the catalog (first run offers the ones whose CLI is already on the computer first) or from a release archive file.
 
 ---
 
@@ -233,7 +233,7 @@ Plugin → host response:
     "_meta": {
       "arvel": {
         "pluginApi": "1",
-        "features": ["status", "models", "usage", "actions", "subagents", "resume", "skills", "interactive"],
+        "features": ["status", "models", "usage", "actions", "subagents", "resume", "skills", "discover"],
         "instructionFiles": ["CLAUDE.md"],
         "skills": { "projectDirs": [".claude/skills"], "spec": "agentskills/1" }
       }
@@ -249,7 +249,7 @@ The optional fields in the response:
 - `instructionFiles` — files the vendor CLI reads automatically from the working directory, such as `CLAUDE.md` or `AGENTS.md`. The host composes project instructions into these files inside the task worktree and hides them from git.
 - `skills.projectDirs` — where the vendor CLI looks for project skills, relative to the session cwd.
 - `skills.spec` — the skill format the CLI understands; `agentskills/1` means the open Agent Skills `SKILL.md` format.
-- `interactive` in `features` — the plugin supports §7.8 (interactive terminal sessions).
+- `discover` in `features` — the plugin supports §7.9.
 
 ### 5.2 Readiness
 
@@ -378,6 +378,7 @@ Standard ACP methods: `session/new`, `session/load`, `session/prompt`, `session/
     "_meta": {
       "arvel": {
         "role": { "id": "developer", "name": "Developer" },
+        "task": { "number": 42, "code": "SHOP-1287", "type": "feature", "readOnly": false },
         "model": "claude-sonnet-5-5",
         "effort": "medium",                 // omitted = Auto
         "instructions": "…role instructions + project rules, already merged by the host…",
@@ -401,6 +402,8 @@ Standard ACP methods: `session/new`, `session/load`, `session/prompt`, `session/
   }
 }
 ```
+
+`role.id` is one of the built-in ids `lead`, `architect`, `developer`, `reviewer`, `security`, `tester`, `keeper`, or `<pluginId>:<roleId>` for a role added by a plugin (§16). `task.type` is a built-in type id (`spec`, `feature`, `bug`, `edit`, `review`, `analysis`) or `<pluginId>:<typeId>`. Both are informative (logs, vendor session titles): plugins MUST NOT change behaviour by role or type. `task.readOnly: true` means the session works on a read-only view of a branch; the host also sends `permissions.edit: "deny"`, and the plugin MUST map it so that no file in `cwd` can be changed.
 
 Plugin obligations:
 
@@ -481,21 +484,9 @@ Subagents: every update produced inside a subagent carries `_meta.arvel.subagent
 
 The host owns the catalogue of skills and MCP servers, along with their scopes and the per-role assignment. Plugins only *deliver* what arrives in a session. They never install skills or MCP servers themselves, and with default connection settings they never load the user's personal skill or MCP configuration into Arvel sessions. The only exception is **read-only discovery on the user's request** (§7.9), which lets the host offer to copy existing definitions into its catalogue.
 
-### 7.8 Interactive terminal sessions (optional feature `interactive`)
+### 7.8 Reserved
 
-Some vendor CLIs have a full-screen interactive mode, such as the `claude` TUI. A user may prefer to work in it directly while Arvel shows the session in the task. The flow:
-
-1. The host calls `_arvel/interactive` with the same params as `session/new`, `_meta.arvel` included, plus an optional `resume` vendor session id.
-2. The plugin prepares everything a headless session would: settings, MCP config, instructions, skills, permission hooks. Then it returns:
-   ```json
-   { "sessionId": "…", "command": ["claude", "--session-id", "…", "--settings", "…", "--mcp-config", "…", "--append-system-prompt-file", "…"],
-     "env": { "…": "…" }, "cwd": "…", "observe": true }
-   ```
-3. The **host** runs the command in its own PTY (the Arvel terminal) on the same machine, and the user works there directly.
-4. With `observe: true`, the plugin follows the vendor's session record (e.g. its transcript file) and emits ordinary `session/update` notifications for the feed, with `_meta.arvel.interactive = true`.
-5. Messages from Arvel to the session (another role's handoff, a reply from the Telegram bot) are delivered by the host as **typed input into the PTY** (bracketed paste + Enter), and only while the TUI is idle. The plugin reports idle/busy through `session/update` with `_meta.arvel.state: "idle" | "busy"`.
-6. Permission prompts appear in the TUI, and the user answers there. The plugin still enforces `deny` rules through the vendor's hook mechanism, so a denied action never runs, even if the user would approve it in the TUI.
-7. `session/cancel` sends the vendor's interrupt key sequence through the host's PTY (the host asks the plugin which sequence via `_meta.arvel.interruptKeys`, e.g. `["\u001b"]`).
+Interactive terminal sessions were dropped before v1 was released: the user talks to agents only through the task feed. The method name `_arvel/interactive` and the feature name `interactive` are reserved and MUST NOT be used.
 
 ---
 
@@ -593,22 +584,22 @@ When a turn stops for `rate_limited`, the plugin MUST leave the vendor session r
 
 ## 13. Conformance
 
-`arvel-plugin-check` (in the Arvel SDK, `arvel-sdk/cmd/arvel-plugin-check`) runs a plugin against a scripted mock host and verifies §2–§10 (§14 for routers), including that the proxy from `sandbox` reaches the vendor CLI's environment (§5.1). A plugin release MUST pass `arvel-plugin-check --level=release` in CI.
+`arvel-plugin-check` (in the Arvel SDK, `arvel-sdk/cmd/arvel-plugin-check`) runs a plugin against a scripted mock host and verifies §2–§10 (§14 for routers, §16.5 for `team` and `integration` plugins), including that the proxy from `sandbox` reaches the vendor CLI's environment (§5.1). A plugin release MUST pass `arvel-plugin-check --level=release` in CI.
 
 ---
 
 ## 14. Router plugins (`type: "router"`)
 
-A router plugin helps the host decide **which roles of the team take part in a task, which role answers a message, and which reasoning effort to use when a role is set to Auto**. It never runs an agent, never sees code or files, and never decides anything the user's team settings forbid.
+A router plugin helps the host decide **which task type fits a new task and which roles it needs, which role answers a message, and which reasoning effort to use when a role is set to Auto**. It never runs an agent, never sees code or files, and never decides anything the user's settings forbid.
 
-Without a router plugin the host uses its built-in **order router** (§14.6). At most one router is active per workspace; the user picks it in Settings.
+Without a router plugin the host uses its built-in **type router** (§14.6): the user picks the type, the type ticks its roles. A router is enabled per workspace on the router's own settings page («Использовать в пространстве»); at most one router is active per workspace.
 
 ### 14.1 What stays the same
 
 Everything in §2 (process, transport, shutdown), §3 (packaging; `type: "router"`, topic `arvel-router`), §4 (connections: a router declares at least one connection kind; its `config` becomes the router's settings form and its `secrets` the keys), §5 (`initialize`, `_arvel/status`), §9 (errors), §10 (logging), §11 (security) and §12 (versioning).
 
 Differences:
-- `initialize` result: `agentCapabilities` is `{}` and `_meta.arvel.features` lists only router features: `route.plan`, `route.message`, `route.effort` (any subset, at least one).
+- `initialize` result: `agentCapabilities` is `{}` and `_meta.arvel.features` lists only router features: `route.plan`, `route.message`, `route.effort` (any subset, at least one), optionally `route.explain`.
 - A router MUST NOT implement `session/*` methods; the host never calls them (`-32601` if it does).
 - `capabilities` in the manifest: `{ "router": { "features": [...], "maxLatencyMs": 3000 } }`.
 - `permissions.network` MUST list every host the router contacts. `permissions.spawn` SHOULD be empty.
@@ -616,9 +607,9 @@ Differences:
 
 ### 14.2 What the host sends (privacy contract)
 
-The host sends **only**: task title and description, the message text (for `route.message`), project names, the UI language, and for each role: `roleId`, name, description ("when this role is needed", ≤ 300 characters) and work kind. **Never** code, diffs, file names, file contents, feed history, knowledge files or secrets of other plugins. The router MUST NOT ask for more and MUST NOT store request text beyond the request (debug logs follow §10).
+The host sends **only**: task title and description, the message text (for `route.message`), project names, the UI language, the task types (id, name, description, default roles) and for each role: `roleId`, name, description ("when this role is needed", ≤ 300 characters) and kind. **Never** code, diffs, file names, file contents, feed history, knowledge files, task codes from trackers or secrets of other plugins. The router MUST NOT ask for more and MUST NOT store request text beyond the request (debug logs follow §10).
 
-Work kinds: `spec` (requirements and acceptance criteria), `plan`, `code`, `review`, `verify`, `answer`, `knowledge`.
+Role kinds: `intake` (the lead's analysis at the start), `plan`, `code`, `check` (review, security, tests — may return findings), `accept` (the lead's acceptance at the end), `knowledge`.
 
 ### 14.3 `_arvel/route/plan` (request)
 
@@ -628,38 +619,40 @@ Called when the user opens New task (after a 600 ms pause in typing) and again o
 { "jsonrpc": "2.0", "id": 7, "method": "_arvel/route/plan",
   "params": {
     "task": { "title": "Webhook signature test fails", "description": "After the last commit …", "projects": ["shop-api"], "language": "ru" },
-    "steps": [
-      { "stepId": "s1", "roleId": "r_analyst",   "name": "Analyst",   "description": "Turns a long spec into requirements…", "kind": "spec",   "participation": "if_needed" },
-      { "stepId": "s2", "roleId": "r_architect", "name": "Architect", "description": "Plans changes that touch several modules…", "kind": "plan", "participation": "usually" },
-      { "stepId": "s3", "roleId": "r_dev",       "name": "Developer", "description": "Writes code by the plan…", "kind": "code", "participation": "always" },
-      { "stepId": "s4", "roleId": "r_review",    "name": "Reviewer",  "description": "…", "kind": "review", "participation": "always" },
-      { "stepId": "s5", "roleId": "r_test",      "name": "Tester",    "description": "Runs tests and browser checks…", "kind": "verify", "participation": "usually" }
+    "types": [
+      { "typeId": "feature", "name": "Feature", "description": "One change with code, the full role chain", "roles": { "lead_intake": "on", "architect": "on", "developer": "on", "reviewer": "on", "security": "auto", "tester": "on", "lead_accept": "on" } },
+      { "typeId": "bug", "name": "Bug", "description": "Diagnosis and fix", "roles": { "developer": "on", "reviewer": "on", "security": "auto", "tester": "on", "lead_accept": "on" } },
+      { "typeId": "analysis", "name": "Analysis", "description": "An answer without changes", "roles": { "lead_intake": "on", "architect": "optional" } }
     ],
-    "presets": [
-      { "presetId": "p_bug", "name": "Bug", "description": "Diagnosis, fix, verification" },
-      { "presetId": "p_review", "name": "Review only", "description": "Read-only review" }
+    "roles": [
+      { "slot": "lead_intake", "roleId": "lead",      "name": "Lead · intake",  "description": "Turns the request into requirements and acceptance criteria…", "kind": "intake" },
+      { "slot": "architect",   "roleId": "architect", "name": "Architect",      "description": "Plans changes that touch several modules…", "kind": "plan" },
+      { "slot": "developer",   "roleId": "developer", "name": "Developer",      "description": "Writes code by the plan…", "kind": "code" },
+      { "slot": "reviewer",    "roleId": "reviewer",  "name": "Reviewer",       "description": "…", "kind": "check" },
+      { "slot": "security",    "roleId": "security",  "name": "Security",       "description": "Checks auth, payments, secrets…", "kind": "check" },
+      { "slot": "tester",      "roleId": "tester",    "name": "Tester",         "description": "Runs tests and browser checks…", "kind": "check" },
+      { "slot": "lead_accept", "roleId": "lead",      "name": "Lead · acceptance", "description": "Checks the result, commits and pushes…", "kind": "accept" }
     ]
   } }
 ```
 
-`participation` comes from the team order (§14.6): `always` | `usually` | `if_needed`. Only `usually` and `if_needed` steps are *decidable*.
+`slot` is a place in the fixed order (§14.6). A role added by a plugin has its own slot id `<pluginId>:<roleId>`. A type's `roles` map gives each slot's default: `on`, `off`, `auto` (the host includes it by a rule, e.g. Security when the change touches sensitive areas) or `optional` (off, offered as a suggestion); missing slots are `off`.
 
 ```json
 { "jsonrpc": "2.0", "id": 7, "result": {
-    "preset": { "presetId": "p_bug", "confidence": 0.81 },
-    "steps": [
-      { "stepId": "s1", "include": false, "confidence": 0.93 },
-      { "stepId": "s2", "include": false, "confidence": 0.77 },
-      { "stepId": "s5", "include": true,  "confidence": 0.88 }
+    "type": { "typeId": "bug", "confidence": 0.84 },
+    "roles": [
+      { "slot": "lead_intake", "include": false, "confidence": 0.91 },
+      { "slot": "tester",      "include": true,  "confidence": 0.71 }
     ]
 } }
 ```
 
 Rules (the host enforces them; `arvel-plugin-check` tests them):
-- `preset` is optional and is `null` when no preset fits; `presetId` MUST be one of the given ids.
-- `steps[]` contains only decidable steps; every `stepId` MUST be one of the given ids; unknown or `always` steps are ignored and logged by the host.
-- `confidence` is in `[0, 1]`. The host applies a decision only when `confidence` ≥ the user's threshold; below it the step keeps its default and the UI shows the suggestion as a question.
-- The router cannot reorder steps, add roles that are not in the order, or change gates.
+- `type` is optional and is `null` when no type fits; `typeId` MUST be one of the given ids. If the user already chose a type by hand, the host ignores this field.
+- `roles[]` decisions are relative to the chosen type's defaults; every `slot` MUST be one of the given slots; decisions on `auto` slots and on `lead_accept` of a type that has it are ignored and logged.
+- `confidence` is in `[0, 1]`. The host applies a decision only when `confidence` ≥ the user's threshold; below it the role keeps its default and the UI shows the suggestion as a question.
+- The router cannot reorder roles, add roles that are not given, change what happens after a role, or change branches.
 
 ### 14.4 `_arvel/route/message` (request)
 
@@ -670,12 +663,12 @@ Called for a message in a running task that has no `@role`.
   "params": {
     "task": { "title": "…", "language": "ru" },
     "message": "The signature test still fails, take a look",
-    "currentRoleId": "r_review",
-    "candidates": [ { "roleId": "r_dev", "name": "Developer", "description": "…", "kind": "code" }, { "roleId": "r_review", "name": "Reviewer", "description": "…", "kind": "review" } ]
+    "currentRoleId": "reviewer",
+    "candidates": [ { "roleId": "developer", "name": "Developer", "description": "…", "kind": "code" }, { "roleId": "reviewer", "name": "Reviewer", "description": "…", "kind": "check" } ]
 } }
 ```
 
-Result: `{ "roleId": "r_dev", "confidence": 0.82, "probabilities": { "r_dev": 0.82, "r_review": 0.18 } }`. `roleId` MUST be one of `candidates` (the roles of this task's steps plus on-call roles). Below the threshold the host keeps `currentRoleId` and shows the suggestion.
+Result: `{ "roleId": "developer", "confidence": 0.82, "probabilities": { "developer": 0.82, "reviewer": 0.18 } }`. `roleId` MUST be one of `candidates` (the roles of this task plus on-call roles). Below the threshold the host keeps `currentRoleId` and shows the suggestion.
 
 ### 14.5 `_arvel/route/effort` (request)
 
@@ -683,30 +676,31 @@ Called before a turn only when the role's effort is **Auto** and the model repor
 
 ```json
 { "method": "_arvel/route/effort",
-  "params": { "text": "…", "roleId": "r_dev", "kind": "code", "levels": ["low", "medium", "high"] } }
+  "params": { "text": "…", "roleId": "developer", "kind": "code", "levels": ["low", "medium", "high"] } }
 ```
 
 Result: `{ "effort": "medium", "confidence": 0.7 }`. `effort` MUST be one of `levels`. Below the threshold the host sends no effort (provider default).
 
-### 14.6 The built-in order router (host, informative)
+### 14.6 The fixed order and the built-in type router (host, informative)
 
-- **Plan:** every `always` and `usually` step is included, `if_needed` steps are not; a chosen preset overrides this selection. The user can tick or untick any step for one task.
-- **Message:** goes to the role of the current stage.
+- **Order** (never changes): `lead_intake` → `architect` → `developer` → `reviewer` → `security` → `tester` → `lead_accept`; the `keeper` role runs in the background after a merge. A plugin role is placed right after a chosen slot or is on call only (§16).
+- **Plan:** the task type chosen by the user (default: the workspace's last used code type, initially `feature`) ticks its `on` slots; `auto` slots are decided by the host's rules during the task; the user can tick or untick any role for one task.
+- **Message:** goes to the role that currently works, or that worked last.
 - **Effort:** Auto = no effort sent.
 
 ### 14.7 Timeouts and failure
 
-- Each route request has a **3 s** deadline on the host side (configurable down, not up). On timeout, error or invalid result, the host uses the order router for that decision, logs it, and shows a small "router unavailable" chip; it never blocks task creation.
+- Each route request has a **3 s** deadline on the host side (configurable down, not up). On timeout, error or invalid result, the host uses the type router for that decision, logs it, and shows a small "router unavailable" chip; it never blocks task creation.
 - When its service is unreachable, a router SHOULD fail fast with `provider_error` instead of waiting for the deadline.
-- Errors use §9 codes. `rate_limited` and `auth_required` are shown on the router's settings card.
+- Errors use §9 codes. `rate_limited` and `auth_required` are shown on the router's settings page.
 
 ### 14.8 Optional: `_arvel/route/explain` (request)
 
-If `features` includes `route.explain`, the host may call it from the settings "Try it" panel with the same params as `route.plan` and shows `{ "lines": [ { "text": "…", "value": 0.82 } ] }` verbatim. Never called during real tasks.
+If `features` includes `route.explain`, the host may call it from the "Try it" panel of the router's settings page with the same params as `route.plan` and shows `{ "lines": [ { "text": "…", "value": 0.82 } ] }` verbatim. Never called during real tasks.
 
 ### 14.9 Conformance for routers
 
-`arvel-plugin-check --level release` with a router binary runs the router suite instead of the session suite: manifest `type`, `initialize` < 5 s with empty `agentCapabilities`, `session/new` → `-32601`, every declared `route.*` feature answers the scripted scenarios with ids only from the request and confidences in `[0, 1]`, a canary secret never appears in output, and a request with a 3 s deadline returns or fails in time.
+`arvel-plugin-check --level release` with a router binary runs the router suite instead of the session suite: manifest `type`, `initialize` < 5 s with empty `agentCapabilities`, `session/new` → `-32601`, every declared `route.*` feature answers the scripted scenarios with ids and slots only from the request and confidences in `[0, 1]`, a canary secret never appears in output, and a request with a 3 s deadline returns or fails in time.
 
 ---
 
@@ -757,9 +751,9 @@ On every level (including «Доверенная», as far as role rules can enf
 
 - **Local git works fully** inside the sandbox: status, diff, log, blame, branches, commits in the task branch, stash, rebase of the task branch. The worktree's `.git` link and the project's git object store are readable and writable as git needs; refs of `main` and of other tasks' branches are protected by a host-installed `pre-commit`/`reference-transaction` hook in the worktree (writes to them are rejected).
 - **Remote operations** need credentials, which never enter the sandbox. They are done **by the host** on the agent's request through tools of the Arvel MCP server:
-  - `git_fetch` — fetch from the project's configured remotes (default: allowed);
-  - `git_push` — push **only the task branch** to the project's remote (role permission «Отправка в удалённый репозиторий»: No / Ask / Yes, default Ask; `main` and protected branches are never pushed by agents);
-  - `pr_open` — open a pull request for the task branch via the provider of the remote, if the host has a token for it (role permission, default Ask).
+  - `git_fetch` — fetch from the project's configured remotes (any role; default: allowed);
+  - `git_push` — push **only the task branch** to the project's remote. Only the `lead` role at acceptance may call it, under the workspace's task-finishing rule «Отправка ветки»: No / Ask / Yes (default Ask). `main` and protected branches are never pushed by agents;
+  - `pr_open` — open a pull request for the task branch via the provider of the remote, if the host has a token for it. Only `lead` at acceptance, under the finishing rule «Pull request»: None / Draft / Ready.
   A plain `git push` inside the sandbox fails with a clear message («используйте инструмент Arvel git_push»), which the role instructions also say.
 
 ### 15.3c Processes and resources
@@ -785,3 +779,68 @@ The host records every denied file or network access (sandbox log, proxy log) wi
 ### 15.7 What is not sandboxed
 
 The user's own terminal in the Code view, merges done by the host, and the host itself. The UI labels the user's terminal «ваш терминал — без песочницы».
+
+---
+
+## 16. Declarative plugins: roles, task types, MCP servers, skills
+
+`team` and `integration` plugins have **no process of their own** unless they ship an MCP server. Everything they add is data in the manifest's `contributes` block plus files in the release archive. The host validates it at install time and shows it in the install dialog. The built-in roles, the fixed order and the built-in task types cannot be changed by any plugin.
+
+### 16.1 Manifest
+
+```json
+{
+  "id": "godot", "name": "Godot", "type": "integration", "version": "0.3.0", "pluginApi": "1",
+  "description": "Godot scenes for Arvel agents: an MCP server, skills and the «Game scene» task type.",
+  "entry": { "darwin-arm64": { "asset": "arvel-plugin-godot_darwin_arm64.tar.gz", "bin": "godot-mcp" } },
+  "checksums": "checksums.txt",
+  "permissions": { "spawn": ["godot"], "network": [], "files": "session-cwd" },
+  "contributes": {
+    "roles": [
+      { "id": "scene-designer", "name": { "en": "Scene designer", "ru": "Дизайнер сцен" },
+        "description": { "en": "Builds and checks Godot scenes…", "ru": "…" },
+        "kind": "code", "placement": { "after": "developer" },
+        "instructions": { "en": "roles/scene-designer.en.md", "ru": "roles/scene-designer.ru.md" },
+        "permissions": { "read": "allow", "edit": "allow", "commands": { "default": "ask", "allow": ["godot --headless *"] }, "network": "ask" },
+        "icon": "palette" }
+    ],
+    "taskTypes": [
+      { "id": "game-scene", "name": { "en": "Game scene", "ru": "Игровая сцена" },
+        "description": { "en": "A scene, its scripts and a screenshot check", "ru": "…" },
+        "roles": { "lead_intake": "on", "architect": "on", "developer": "on", "security": "auto", "lead_accept": "on", "godot:scene-designer": "on" },
+        "branch": "new", "result": "code" }
+    ],
+    "mcpServers": [
+      { "name": "godot", "command": ["{bin}", "--stdio"], "tools": ["scene_tree", "run_scene", "screenshot"] }
+    ],
+    "skills": [ { "name": "godot-scenes", "path": "skills/godot-scenes" } ]
+  }
+}
+```
+
+### 16.2 Roles
+
+- `id` `^[a-z][a-z0-9-]{1,39}$`; the host stores it as `<pluginId>:<id>`.
+- `kind`: `plan`, `code`, `check` or `read` (answers and reports, no edits). `intake`, `accept` and `knowledge` are reserved for the built-in roles.
+- `placement`: `{ "after": "<slot>" }` — the role runs right after that slot when a task includes it; several plugin roles after the same slot run in install order. `{ "onCall": true }` — the role is never in the order; it is reached by `@role` in a task and as a subagent target.
+- `instructions`: Markdown files in the release archive, at most 16 KiB each, appended to the host's common role preamble. The user's additional instructions are added after them.
+- `permissions`: the role's defaults, in the §7.1 shape. The user can change them. A `kind: read` role never gets `edit: allow`.
+- A `check` role's findings are handled like the built-in check roles («если есть замечания»).
+
+### 16.3 Task types
+
+- `id` as for roles; stored as `<pluginId>:<id>`.
+- `roles`: a map of slots (built-in slots and `<pluginId>:<roleId>` of roles from **this** plugin) to `on` | `off` | `auto` | `optional`. `auto` is valid only for `security`. `lead_accept` MUST be `on` for `result: code`.
+- `branch`: the default branch mode — `new` | `continue` | `view` (read-only) | `ask`.
+- `result`: `code` (commits in the task branch), `report` (a read-only answer; every role works on a read-only view) or `subtasks` (the type produces a plan of subtasks, like the built-in `spec` type).
+
+### 16.4 MCP servers and skills
+
+- `mcpServers[]`: stdio servers started from the plugin's own release binary (`{bin}` is the entry binary) or an HTTP `url`. The host adds them to its catalogue of agent tools with the scope «из плагина», shows the first-run review like any MCP server, runs them inside the workspace sandbox (§15) and lets roles opt in per tool. A plugin cannot assign its servers to roles itself.
+- `skills[]`: Agent Skills folders inside the release archive, added to the catalogue with the scope «из плагина», delivered through §7.1 `skills`.
+- `team` plugins MUST NOT have `entry`, `mcpServers` or `skills`; `integration` plugins MUST have at least one MCP server or skill.
+
+### 16.5 Validation and conformance
+
+`arvel-plugin-check --manifest arvel.json` (no binary needed for `team`) validates `contributes`: ids, kinds, placements pointing at existing slots, type maps using only known slots, `auto` only for `security`, instruction files present and within size, localisation keys `en` (required) and `ru` (optional). For `integration` plugins with an MCP server binary it also starts the server and lists its tools over MCP.
+

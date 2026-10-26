@@ -1,0 +1,61 @@
+{
+  "$schema": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
+  "id": "echo-router",
+  "name": "Echo router",
+  "type": "router",
+  "version": "0.1.0",
+  "pluginApi": "1",
+  "description": "Deterministic keyword router used by the SDK tests and as a template.",
+  "license": "MIT-0",
+  "entry": {
+    "darwin-arm64": {
+      "asset": "arvel-plugin-echo-router_darwin_arm64.tar.gz",
+      "bin": "arvel-plugin-echo-router"
+    },
+    "darwin-amd64": {
+      "asset": "arvel-plugin-echo-router_darwin_amd64.tar.gz",
+      "bin": "arvel-plugin-echo-router"
+    },
+    "linux-amd64": {
+      "asset": "arvel-plugin-echo-router_linux_amd64.tar.gz",
+      "bin": "arvel-plugin-echo-router"
+    },
+    "linux-arm64": {
+      "asset": "arvel-plugin-echo-router_linux_arm64.tar.gz",
+      "bin": "arvel-plugin-echo-router"
+    },
+    "windows-amd64": {
+      "asset": "arvel-plugin-echo-router_windows_amd64.zip",
+      "bin": "arvel-plugin-echo-router.exe"
+    },
+    "windows-arm64": {
+      "asset": "arvel-plugin-echo-router_windows_arm64.zip",
+      "bin": "arvel-plugin-echo-router.exe"
+    }
+  },
+  "checksums": "checksums.txt",
+  "permissions": {},
+  "connections": [
+    {
+      "kind": "local",
+      "label": "Local rules",
+      "billing": "unknown",
+      "config": {
+        "type": "object",
+        "properties": {}
+      },
+      "secrets": []
+    }
+  ],
+  "capabilities": {
+    "router": {
+      "features": [
+        "route.plan",
+        "route.message",
+        "route.effort",
+        "route.explain"
+      ],
+      "maxLatencyMs": 3000
+    }
+  }
+}

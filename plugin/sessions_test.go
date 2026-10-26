@@ -5,6 +5,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -343,5 +344,46 @@ func TestShutdown_PanickingCloseDoesNotStopOthers(t *testing.T) {
 	h.shutdown()
 	if p.session(1).closeN.Load() != 1 || h.runErr != nil {
 		t.Fatalf("second session closes = %d, Run = %v", p.session(1).closeN.Load(), h.runErr)
+	}
+}
+
+// readOnlyMeta is a session _meta whose task is read-only while the host
+// (wrongly) allows edits.
+func readOnlyMeta(readOnly bool) map[string]any {
+	return map[string]any{"arvel": map[string]any{
+		"task":        map[string]any{"number": 1, "type": "review", "readOnly": readOnly},
+		"permissions": map[string]any{"read": "allow", "edit": "allow"},
+	}}
+}
+
+func TestNewSession_ReadOnlyTaskForcesEditDeny(t *testing.T) {
+	for _, readOnly := range []bool{true, false} {
+		t.Run(fmt.Sprintf("readOnly=%v", readOnly), func(t *testing.T) {
+			p := newStub(t)
+			h := readyHarness(t, p)
+			params := map[string]any{"cwd": testCWD, "mcpServers": []any{}, "_meta": readOnlyMeta(readOnly)}
+			if err := h.call(protocol.MethodSessionNew, params, nil); err != nil {
+				t.Fatal(err)
+			}
+			want := protocol.PermissionLevelAllow
+			if readOnly {
+				want = protocol.PermissionLevelDeny
+			}
+			if got := p.lastNew.Meta.Permissions.Edit; got != want {
+				t.Errorf("edit = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestLoadSession_ReadOnlyTaskForcesEditDeny(t *testing.T) {
+	p := withFeatures(t, Features{LoadSession: true})
+	h := readyHarness(t, p)
+	params := map[string]any{"sessionId": "old-1", "cwd": testCWD, "mcpServers": []any{}, "_meta": readOnlyMeta(true)}
+	if err := h.call(protocol.MethodSessionLoad, params, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := p.lastLoad.Meta.Permissions.Edit; got != protocol.PermissionLevelDeny {
+		t.Fatalf("edit = %q, want deny", got)
 	}
 }

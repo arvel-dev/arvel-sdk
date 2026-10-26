@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package manifest loads and validates arvel.json, the manifest of an Arvel
-// plugin (docs/PROTOCOL.md §3.2, §4, §14.1).
+// plugin (docs/PROTOCOL.md §3.2, §4, §14.1, §16).
 package manifest
 
 import (
@@ -23,12 +23,20 @@ const maxManifestSize = 1 << 20
 type PluginType string
 
 const (
-	TypeProvider PluginType = "provider"
-	TypeRouter   PluginType = "router"
+	TypeProvider    PluginType = "provider"
+	TypeRouter      PluginType = "router"
+	TypeTeam        PluginType = "team"
+	TypeIntegration PluginType = "integration"
 )
 
 // Valid reports whether t is a plugin type this SDK handles.
-func (t PluginType) Valid() bool { return t == TypeProvider || t == TypeRouter }
+func (t PluginType) Valid() bool {
+	return t == TypeProvider || t == TypeRouter || t == TypeTeam || t == TypeIntegration
+}
+
+// Declarative reports whether the plugin is data only (PROTOCOL §16): a team or
+// integration plugin.
+func (t PluginType) Declarative() bool { return t == TypeTeam || t == TypeIntegration }
 
 // ManifestSandbox is the "sandbox" block (PROTOCOL §3.2, §15).
 type ManifestSandbox = protocol.ManifestSandbox
@@ -44,13 +52,14 @@ type Manifest struct {
 	Description  string           `json:"description,omitempty"`
 	Homepage     string           `json:"homepage,omitempty"`
 	License      string           `json:"license,omitempty"`
-	Entry        EntrySpec        `json:"entry"`
+	Entry        EntrySpec        `json:"entry,omitzero"`
 	Checksums    string           `json:"checksums,omitempty"`
 	Requires     []Requirement    `json:"requires,omitempty"`
 	Permissions  Permissions      `json:"permissions"`
 	Sandbox      *ManifestSandbox `json:"sandbox,omitempty"`
-	Connections  []Connection     `json:"connections"`
+	Connections  []Connection     `json:"connections,omitempty"`
 	Capabilities Capabilities     `json:"capabilities,omitzero"`
+	Contributes  *Contributes     `json:"contributes,omitempty"`
 
 	raw []byte // the document passed to Load, validated against the schema
 }
