@@ -1,0 +1,16 @@
+# ---- AI tooling: local only, never committed ----
+.ai-factory/
+.ai-factory.json
+.claude/
+.mcp.json
+.codex/
+.agents/
+AGENTS.md
+CLAUDE.md
+
+/dist/
+/bin/
+*.test
+coverage.*
+spikes/**/bin/
+.DS_Store
