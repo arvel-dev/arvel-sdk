@@ -69,7 +69,7 @@ func TestStart_CmdShimRejectsUnsafeArgs(t *testing.T) {
 }
 
 func TestStart_CmdShimExitCode(t *testing.T) {
-	p, err := Start(context.Background(), Spec{Path: writeShim(t, "exit", "& exit /b 7"), Args: []string{"0"}})
+	p, err := Start(context.Background(), Spec{Path: writeShim(t, "exit", "exit /b 7"), Args: []string{"0"}})
 	if err != nil {
 		t.Fatal(err)
 	}

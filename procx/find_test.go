@@ -110,11 +110,11 @@ func TestFindIn_SkipsNonExecutable(t *testing.T) {
 
 func TestFindIn_SkipsDirectories(t *testing.T) {
 	a, b := t.TempDir(), t.TempDir()
-	if err := os.Mkdir(filepath.Join(a, "tool"), 0o755); err != nil {
+	if err := os.Mkdir(filepath.Join(a, exeName()), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	want := writeExe(t, b, "tool")
-	got, err := findIn("linux", "tool", []string{a, b}, "")
+	want := writeExe(t, b, exeName())
+	got, err := findIn(runtime.GOOS, "tool", []string{a, b}, ".EXE")
 	if err != nil || got != resolved(t, want) {
 		t.Fatalf("got %q, %v", got, err)
 	}
