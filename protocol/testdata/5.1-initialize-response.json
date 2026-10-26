@@ -1,0 +1,48 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": 1,
+    "agentCapabilities": {
+      "loadSession": true,
+      "promptCapabilities": {
+        "image": true,
+        "audio": false,
+        "embeddedContext": true
+      },
+      "mcpCapabilities": {
+        "http": true,
+        "sse": false
+      }
+    },
+    "agentInfo": {
+      "name": "arvel-plugin-claude",
+      "version": "0.1.0"
+    },
+    "authMethods": [],
+    "_meta": {
+      "arvel": {
+        "pluginApi": "1",
+        "features": [
+          "status",
+          "models",
+          "usage",
+          "actions",
+          "subagents",
+          "resume",
+          "skills",
+          "interactive"
+        ],
+        "instructionFiles": [
+          "CLAUDE.md"
+        ],
+        "skills": {
+          "projectDirs": [
+            ".claude/skills"
+          ],
+          "spec": "agentskills/1"
+        }
+      }
+    }
+  }
+}

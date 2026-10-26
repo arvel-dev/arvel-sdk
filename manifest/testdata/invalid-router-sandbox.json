@@ -1,0 +1,61 @@
+{
+  "id": "jev",
+  "name": "Jev router",
+  "type": "router",
+  "version": "0.1.0",
+  "pluginApi": "1",
+  "entry": {
+    "darwin-arm64": {
+      "asset": "arvel-plugin-jev_darwin_arm64.tar.gz",
+      "bin": "arvel-plugin-jev"
+    },
+    "darwin-amd64": {
+      "asset": "arvel-plugin-jev_darwin_amd64.tar.gz",
+      "bin": "arvel-plugin-jev"
+    },
+    "linux-amd64": {
+      "asset": "arvel-plugin-jev_linux_amd64.tar.gz",
+      "bin": "arvel-plugin-jev"
+    },
+    "linux-arm64": {
+      "asset": "arvel-plugin-jev_linux_arm64.tar.gz",
+      "bin": "arvel-plugin-jev"
+    },
+    "windows-amd64": {
+      "asset": "arvel-plugin-jev_windows_amd64.tar.gz",
+      "bin": "arvel-plugin-jev"
+    },
+    "windows-arm64": {
+      "asset": "arvel-plugin-jev_windows_arm64.tar.gz",
+      "bin": "arvel-plugin-jev"
+    }
+  },
+  "checksums": "checksums.txt",
+  "permissions": {},
+  "connections": [
+    {
+      "kind": "local",
+      "label": "Local rules",
+      "billing": "unknown",
+      "config": {
+        "type": "object",
+        "properties": {}
+      },
+      "secrets": []
+    }
+  ],
+  "capabilities": {
+    "router": {
+      "features": [
+        "route.plan",
+        "route.message"
+      ],
+      "maxLatencyMs": 3000
+    }
+  },
+  "sandbox": {
+    "vendorHosts": [
+      "x.example.com"
+    ]
+  }
+}

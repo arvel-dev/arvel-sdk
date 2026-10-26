@@ -1,0 +1,75 @@
+{
+  "method": "session/new",
+  "params": {
+    "cwd": "/srv/arvel/worktrees/shop/task-42",
+    "mcpServers": [
+      {
+        "name": "arvel",
+        "command": "/opt/arvel/arvel-host",
+        "args": [
+          "mcp",
+          "--session",
+          "s_01J..."
+        ],
+        "env": []
+      }
+    ],
+    "_meta": {
+      "arvel": {
+        "role": {
+          "id": "developer",
+          "name": "Developer"
+        },
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "instructions": "…role instructions + project rules, already merged by the host…",
+        "language": "ru",
+        "permissions": {
+          "read": "allow",
+          "edit": "allow",
+          "commands": {
+            "default": "ask",
+            "allow": [
+              "go test *",
+              "go vet *"
+            ],
+            "deny": [
+              "git push *"
+            ]
+          },
+          "network": "ask",
+          "mcp": {
+            "default": "ask",
+            "tools": {
+              "postgres/query": "allow",
+              "postgres/execute": "deny"
+            }
+          }
+        },
+        "subagents": {
+          "enabled": true,
+          "model": "claude-haiku-5-5",
+          "effort": "low",
+          "maxParallel": 2
+        },
+        "budget": {
+          "maxTurns": 200,
+          "maxUsd": 5.0
+        },
+        "skills": [
+          {
+            "name": "laravel-migrations",
+            "path": "/…/arvel/skills/laravel-migrations",
+            "invocation": "auto"
+          },
+          {
+            "name": "release-notes",
+            "path": "/…/arvel/skills/release-notes",
+            "invocation": "manual"
+          }
+        ],
+        "resumeFrom": null
+      }
+    }
+  }
+}

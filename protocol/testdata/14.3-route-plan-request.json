@@ -1,0 +1,69 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "_arvel/route/plan",
+  "params": {
+    "task": {
+      "title": "Webhook signature test fails",
+      "description": "After the last commit …",
+      "projects": [
+        "shop-api"
+      ],
+      "language": "ru"
+    },
+    "steps": [
+      {
+        "stepId": "s1",
+        "roleId": "r_analyst",
+        "name": "Analyst",
+        "description": "Turns a long spec into requirements…",
+        "kind": "spec",
+        "participation": "if_needed"
+      },
+      {
+        "stepId": "s2",
+        "roleId": "r_architect",
+        "name": "Architect",
+        "description": "Plans changes that touch several modules…",
+        "kind": "plan",
+        "participation": "usually"
+      },
+      {
+        "stepId": "s3",
+        "roleId": "r_dev",
+        "name": "Developer",
+        "description": "Writes code by the plan…",
+        "kind": "code",
+        "participation": "always"
+      },
+      {
+        "stepId": "s4",
+        "roleId": "r_review",
+        "name": "Reviewer",
+        "description": "…",
+        "kind": "review",
+        "participation": "always"
+      },
+      {
+        "stepId": "s5",
+        "roleId": "r_test",
+        "name": "Tester",
+        "description": "Runs tests and browser checks…",
+        "kind": "verify",
+        "participation": "usually"
+      }
+    ],
+    "presets": [
+      {
+        "presetId": "p_bug",
+        "name": "Bug",
+        "description": "Diagnosis, fix, verification"
+      },
+      {
+        "presetId": "p_review",
+        "name": "Review only",
+        "description": "Read-only review"
+      }
+    ]
+  }
+}

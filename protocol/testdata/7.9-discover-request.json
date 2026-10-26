@@ -1,0 +1,13 @@
+{
+  "method": "_arvel/discover",
+  "params": {
+    "kinds": [
+      "mcp",
+      "skills"
+    ],
+    "projects": [
+      "/Users/me/code/shop-api",
+      "/Users/me/code/shop-admin"
+    ]
+  }
+}

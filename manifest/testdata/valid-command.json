@@ -1,0 +1,30 @@
+{
+  "id": "gemini",
+  "name": "Gemini",
+  "type": "provider",
+  "version": "0.1.0",
+  "pluginApi": "1",
+  "entry": {
+    "command": [
+      "gemini",
+      "--experimental-acp"
+    ]
+  },
+  "requires": [
+    {
+      "binary": "gemini"
+    }
+  ],
+  "permissions": {
+    "spawn": [
+      "gemini"
+    ]
+  },
+  "connections": [
+    {
+      "kind": "subscription",
+      "label": "Gemini CLI",
+      "billing": "unknown"
+    }
+  ]
+}

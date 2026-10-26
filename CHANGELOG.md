@@ -17,6 +17,17 @@ change the Go API; every such change carries a migration note. The protocol
   SDK ships its own `jsonrpc/` package, because `acp-go-sdk` limits lines to 10 MiB
   and the protocol requires 64 MiB; only its schema types are used.
 
+- `protocol` package: wire types for every `_meta.arvel` and `_arvel/*` structure,
+  enums with `Valid()`, the error model (`ErrorCode`, `RPCError`, `NewError`),
+  `MetaFrom` and `WithMeta`, and the router types with `Validate` on every router
+  result.
+- `manifest` package: `Load`, `LoadFile`, `Validate` (JSON Schema plus semantic
+  checks, including the `sandbox` block and its forbidden-path rules), `EntryFor`
+  and `DiffPermissions` for update permission diffs.
+- `schema/arvel.schema.json` and the `schema` package that embeds it.
+- Golden tests that bind every example of `docs/PROTOCOL.md` to the Go types; a
+  new example in the document fails the build until it has a golden file.
+
 ### Changed
 - `docs/PROTOCOL.md` synced with the workspace sandbox (S7): new §15 Workspace
   sandbox, the manifest `sandbox` block, the `initialize` `sandbox` field, one
@@ -24,4 +35,7 @@ change the Go API; every such change carries a migration note. The protocol
   conformance note. The change is additive within `pluginApi: "1"`.
 
 ### API changes
-- None. The module exports no identifiers yet.
+- New exported packages `protocol`, `manifest` and `schema`. All changes are
+  additive; there are no breaking changes.
+- New dependencies: `github.com/santhosh-tekuri/jsonschema/v6` and
+  `golang.org/x/mod` (plus `golang.org/x/text`, which `jsonschema` needs).

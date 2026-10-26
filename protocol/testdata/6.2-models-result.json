@@ -1,0 +1,31 @@
+{
+  "models": [
+    {
+      "id": "claude-sonnet-5-5",
+      "label": "Sonnet 5.5",
+      "description": "Fast, strong default for coding",
+      "aliases": [
+        "sonnet"
+      ],
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "defaultEffort": "medium",
+      "contextWindow": 1000000,
+      "inputs": [
+        "text",
+        "image"
+      ],
+      "billing": "subscription",
+      "recommendedFor": [
+        "implement"
+      ],
+      "hidden": false
+    }
+  ],
+  "default": "claude-sonnet-5-5"
+}

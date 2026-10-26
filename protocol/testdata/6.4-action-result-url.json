@@ -1,0 +1,6 @@
+{
+  "kind": "url",
+  "url": "https://auth.openai.com/...",
+  "explain": "Open this link and sign in.",
+  "awaitCompletion": true
+}

@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "arvel": {
+      "usage": {
+        "inputTokens": 120334,
+        "outputTokens": 8812,
+        "cacheReadTokens": 98000,
+        "costUsd": 0.42,
+        "costSource": "estimated"
+      }
+    }
+  }
+}

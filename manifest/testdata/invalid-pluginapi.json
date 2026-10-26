@@ -1,0 +1,123 @@
+{
+  "$schema": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
+  "id": "claude",
+  "name": "Claude",
+  "type": "provider",
+  "version": "0.1.0",
+  "pluginApi": "2",
+  "description": "Claude models through the official claude CLI \u2014 with your Claude plan or an API key.",
+  "homepage": "https://github.com/arvel-dev/arvel-plugin-claude",
+  "license": "Apache-2.0",
+  "entry": {
+    "darwin-arm64": {
+      "asset": "arvel-plugin-claude_darwin_arm64.tar.gz",
+      "bin": "arvel-plugin-claude"
+    },
+    "darwin-amd64": {
+      "asset": "arvel-plugin-claude_darwin_amd64.tar.gz",
+      "bin": "arvel-plugin-claude"
+    },
+    "linux-amd64": {
+      "asset": "arvel-plugin-claude_linux_amd64.tar.gz",
+      "bin": "arvel-plugin-claude"
+    },
+    "linux-arm64": {
+      "asset": "arvel-plugin-claude_linux_arm64.tar.gz",
+      "bin": "arvel-plugin-claude"
+    },
+    "windows-amd64": {
+      "asset": "arvel-plugin-claude_windows_amd64.zip",
+      "bin": "arvel-plugin-claude.exe"
+    },
+    "windows-arm64": {
+      "asset": "arvel-plugin-claude_windows_arm64.zip",
+      "bin": "arvel-plugin-claude.exe"
+    }
+  },
+  "checksums": "checksums.txt",
+  "requires": [
+    {
+      "binary": "claude",
+      "minVersion": "2.1.259",
+      "versionArgs": [
+        "--version"
+      ],
+      "install": {
+        "darwin": "curl -fsSL https://claude.ai/install.sh | bash",
+        "linux": "curl -fsSL https://claude.ai/install.sh | bash",
+        "windows": "irm https://claude.ai/install.ps1 | iex",
+        "docs": "https://code.claude.com/docs/en/setup"
+      }
+    }
+  ],
+  "permissions": {
+    "spawn": [
+      "claude"
+    ],
+    "network": [
+      "api.anthropic.com"
+    ],
+    "files": "session-cwd"
+  },
+  "sandbox": {
+    "vendorPaths": {
+      "read": [
+        "~/.claude",
+        "~/.claude.json"
+      ],
+      "write": [
+        "~/.claude",
+        "~/.claude.json"
+      ]
+    },
+    "vendorHosts": [
+      "api.anthropic.com",
+      "*.anthropic.com",
+      "claude.ai"
+    ],
+    "macosKeychain": true
+  },
+  "connections": [
+    {
+      "kind": "subscription",
+      "label": "Claude plan (via claude CLI)",
+      "billing": "subscription",
+      "description": "Uses the claude CLI signed in with your own Claude account.",
+      "config": {
+        "type": "object",
+        "properties": {
+          "loadProjectSettings": {
+            "type": "boolean",
+            "default": false,
+            "title": "Load the project's own Claude settings (hooks, .mcp.json)"
+          }
+        }
+      },
+      "secrets": []
+    },
+    {
+      "kind": "api_key",
+      "label": "Claude API key",
+      "billing": "api",
+      "config": {
+        "type": "object",
+        "properties": {}
+      },
+      "secrets": [
+        {
+          "id": "apiKey",
+          "label": "Anthropic API key",
+          "pattern": "^sk-ant-",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "capabilities": {
+    "usage": "windows+spend",
+    "subagents": true,
+    "resume": true,
+    "modelSwitch": "live",
+    "effortSwitch": "next-turn"
+  }
+}

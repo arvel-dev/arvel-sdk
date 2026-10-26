@@ -1,0 +1,8 @@
+{
+  "roleId": "r_dev",
+  "confidence": 0.82,
+  "probabilities": {
+    "r_dev": 0.82,
+    "r_review": 0.18
+  }
+}

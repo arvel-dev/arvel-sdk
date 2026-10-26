@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
+  "title": "Arvel plugin manifest",
+  "description": "arvel.json of an Arvel provider or router plugin (Arvel Provider Protocol v1, section 3.2). Unknown fields are allowed outside connection config: readers ignore them.",
+  "type": "object",
+  "required": ["id", "name", "type", "version", "pluginApi", "entry", "connections"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "type": { "enum": ["provider", "router"] },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "pluginApi": { "const": "1" },
+    "description": { "type": "string" },
+    "homepage": { "type": "string" },
+    "license": { "type": "string" },
+    "entry": {
+      "oneOf": [{ "$ref": "#/$defs/entryCommand" }, { "$ref": "#/$defs/entryPlatforms" }]
+    },
+    "checksums": { "type": "string" },
+    "requires": { "type": "array", "items": { "$ref": "#/$defs/requirement" } },
+    "permissions": { "$ref": "#/$defs/permissions" },
+    "sandbox": { "$ref": "#/$defs/sandbox" },
+    "connections": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/connection" } },
+    "capabilities": { "$ref": "#/$defs/capabilities" }
+  },
+  "$defs": {
+    "stringList": { "type": "array", "items": { "type": "string" } },
+    "entryCommand": {
+      "type": "object",
+      "required": ["command"],
+      "maxProperties": 1,
+      "properties": {
+        "command": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "entryPlatforms": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z0-9]+-[a-z0-9]+$" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["asset", "bin"],
+        "properties": {
+          "asset": { "type": "string", "minLength": 1 },
+          "bin": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "required": ["binary"],
+      "properties": {
+        "binary": { "type": "string", "minLength": 1 },
+        "minVersion": { "type": "string" },
+        "versionArgs": { "$ref": "#/$defs/stringList" },
+        "install": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "properties": {
+        "spawn": { "$ref": "#/$defs/stringList" },
+        "network": { "$ref": "#/$defs/stringList" },
+        "files": { "type": "string" }
+      }
+    },
+    "sandbox": {
+      "type": "object",
+      "properties": {
+        "vendorPaths": {
+          "type": "object",
+          "properties": {
+            "read": { "$ref": "#/$defs/stringList" },
+            "write": { "$ref": "#/$defs/stringList" }
+          }
+        },
+        "vendorHosts": { "$ref": "#/$defs/stringList" },
+        "macosKeychain": { "type": "boolean" }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "required": ["kind", "label", "billing"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "billing": { "enum": ["subscription", "api", "mixed", "unknown"] },
+        "description": { "type": "string" },
+        "config": { "$ref": "#/$defs/configSubset" },
+        "secrets": { "type": "array", "items": { "$ref": "#/$defs/secret" } }
+      }
+    },
+    "secret": {
+      "type": "object",
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "pattern": { "type": "string" },
+        "required": { "type": "boolean" }
+      }
+    },
+    "configSubset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "object" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "#/$defs/configBoolean" },
+              { "$ref": "#/$defs/configString" },
+              { "$ref": "#/$defs/configInteger" }
+            ]
+          }
+        }
+      }
+    },
+    "configBoolean": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "boolean" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "default": { "type": "boolean" }
+      }
+    },
+    "configString": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "default": { "type": "string" },
+        "enum": { "type": "array", "items": { "type": "string" } },
+        "pattern": { "type": "string" }
+      }
+    },
+    "configInteger": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "integer" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "default": { "type": "integer" },
+        "minimum": { "type": "integer" },
+        "maximum": { "type": "integer" }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "usage": { "type": "string" },
+        "subagents": { "type": "boolean" },
+        "resume": { "type": "boolean" },
+        "modelSwitch": { "type": "string" },
+        "effortSwitch": { "type": "string" },
+        "router": {
+          "type": "object",
+          "properties": {
+            "features": {
+              "type": "array",
+              "items": { "enum": ["route.plan", "route.message", "route.effort", "route.explain"] }
+            },
+            "maxLatencyMs": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    }
+  }
+}

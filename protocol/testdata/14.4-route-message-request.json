@@ -1,0 +1,25 @@
+{
+  "method": "_arvel/route/message",
+  "params": {
+    "task": {
+      "title": "…",
+      "language": "ru"
+    },
+    "message": "The signature test still fails, take a look",
+    "currentRoleId": "r_review",
+    "candidates": [
+      {
+        "roleId": "r_dev",
+        "name": "Developer",
+        "description": "…",
+        "kind": "code"
+      },
+      {
+        "roleId": "r_review",
+        "name": "Reviewer",
+        "description": "…",
+        "kind": "review"
+      }
+    ]
+  }
+}
