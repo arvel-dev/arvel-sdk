@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -85,3 +86,25 @@ jobs:
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
       - name: Probes
         run: go test -count=1 ./...
+
+  packaging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Download module dependencies
+        run: go mod download
+      - name: Install and check the pinned packaging tool
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: v2.19.0
+          args: check
+      - name: Build snapshots and verify every archive and checksum
+        run: go test -v ./internal/releasecheck -run Packaging -count=1
+        env:
+          ARVEL_PACKAGING: '1'

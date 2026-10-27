@@ -1,0 +1,59 @@
+{
+  "$schema": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
+  "id": "example",
+  "name": "Example provider",
+  "type": "provider",
+  "version": "0.1.0",
+  "pluginApi": "1",
+  "description": "Replace this description with what your provider connects to Arvel.",
+  "license": "MIT-0",
+  "entry": {
+    "darwin-arm64": {
+      "asset": "arvel-plugin-example_darwin_arm64.tar.gz",
+      "bin": "arvel-plugin-example"
+    },
+    "darwin-amd64": {
+      "asset": "arvel-plugin-example_darwin_amd64.tar.gz",
+      "bin": "arvel-plugin-example"
+    },
+    "linux-amd64": {
+      "asset": "arvel-plugin-example_linux_amd64.tar.gz",
+      "bin": "arvel-plugin-example"
+    },
+    "linux-arm64": {
+      "asset": "arvel-plugin-example_linux_arm64.tar.gz",
+      "bin": "arvel-plugin-example"
+    },
+    "windows-amd64": {
+      "asset": "arvel-plugin-example_windows_amd64.zip",
+      "bin": "arvel-plugin-example.exe"
+    },
+    "windows-arm64": {
+      "asset": "arvel-plugin-example_windows_arm64.zip",
+      "bin": "arvel-plugin-example.exe"
+    }
+  },
+  "checksums": "checksums.txt",
+  "permissions": {
+    "spawn": [],
+    "network": [],
+    "files": "session-cwd"
+  },
+  "connections": [
+    {
+      "kind": "local",
+      "label": "Local echo",
+      "billing": "unknown",
+      "config": {
+        "type": "object",
+        "properties": {}
+      },
+      "secrets": []
+    }
+  ],
+  "capabilities": {
+    "usage": "windows",
+    "resume": true,
+    "effortSwitch": "next-turn"
+  }
+}

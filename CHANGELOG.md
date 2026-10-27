@@ -18,6 +18,12 @@ change the Go API; every such change carries a migration note. The protocol
   executable filenames with `.exe` on Windows.
 
 ### Added
+- Author guides for provider, router, team and integration plugins, with
+  standalone examples and pinned SDK setup instructions.
+- Copyable manifests, README skeletons, CI and draft-release workflows for
+  binary and data-only plugins, plus exact versioned CHANGELOG extraction.
+- Six-platform `arvel-plugin-check` release archives with SHA-256 checksums;
+  release automation validates examples and creates a draft for review.
 - `testkit/mockhost` exposes captured raw protocol output through `Stdout()`.
 - Go module `github.com/arvel-dev/arvel-sdk` with a documented root package.
 - `docs/PROTOCOL.md`: the Arvel Provider Protocol v1, now the source of truth.

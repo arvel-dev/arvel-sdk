@@ -1,38 +1,55 @@
-# Release workflow for a team plugin: it packs only data (arvel.json, roles/ and
-# checksums.txt) and creates a draft GitHub release. Copy it to
-# .github/workflows/release.yml in the plugin repository.
+# SPDX-License-Identifier: MIT-0
+# Copy as .github/workflows/release.yml in a standalone team plugin repository.
+# Copy templates/scripts/release-notes.sh to scripts/release-notes.sh too.
 name: Release
-
 on:
   push:
     tags: ['v*']
-
 permissions:
-  contents: write
-
+  contents: read
+env:
+  PLUGIN_NAME: arvel-plugin-team-sample
 jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Set the version from the tag
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.2'
+      - name: Install the pinned manifest checker
+        run: go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.1.0
+      - name: Require versioned release notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: sh scripts/release-notes.sh "${RELEASE_TAG#v}" > "$RUNNER_TEMP/release-notes.md"
+      - name: Stage the tag-versioned data package
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          jq --arg v "$VERSION" '.version = $v' arvel.json > arvel.json.new
-          mv arvel.json.new arvel.json
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-      - name: Pack the plugin
+          mkdir -p "$RUNNER_TEMP/team-package"
+          jq --arg v "${RELEASE_TAG#v}" '.version = $v' arvel.json > "$RUNNER_TEMP/team-package/arvel.json"
+          cp -R roles "$RUNNER_TEMP/team-package/roles"
+      - name: Validate the files that will ship
+        run: arvel-plugin-check --manifest "$RUNNER_TEMP/team-package/arvel.json" --package "$RUNNER_TEMP/team-package"
+      - name: Pack data and calculate hashes
+        working-directory: ${{ runner.temp }}/team-package
         run: |
-          tar -czf arvel-plugin-team-sample.tar.gz arvel.json roles
-          sha256sum arvel.json arvel-plugin-team-sample.tar.gz > checksums.txt
-      - name: Release notes from CHANGELOG.md
-        run: |
-          awk -v v="$VERSION" '/^## \[/ { p = index($0, "[" v "]") > 0; next } p' CHANGELOG.md > notes.md
-          test -s notes.md
-      - name: Create the draft release
+          tar -czf "$PLUGIN_NAME.tar.gz" arvel.json roles
+          sha256sum arvel.json "$PLUGIN_NAME.tar.gz" > checksums.txt
+      - name: Create the draft
+        working-directory: ${{ runner.temp }}/team-package
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" \
-            --notes-file notes.md arvel.json arvel-plugin-team-sample.tar.gz checksums.txt
+          set -- --draft
+          case "$RELEASE_TAG" in
+            *-*) set -- "$@" --prerelease ;;
+          esac
+          gh release create "$RELEASE_TAG" "$@" --title "$RELEASE_TAG" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" arvel.json "$PLUGIN_NAME.tar.gz" checksums.txt
