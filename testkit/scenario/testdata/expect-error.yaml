@@ -1,0 +1,8 @@
+name: expect-error
+plugin: {}
+initialize:
+  connection: { kind: local, config: {} }
+steps:
+  - call: session/new
+    params: { cwd: "/x", mcpServers: [] }
+    expectError: { code: -32601 }

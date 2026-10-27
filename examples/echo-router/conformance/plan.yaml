@@ -1,0 +1,35 @@
+name: echo-router-plan
+plugin: {}
+initialize:
+  connection: { kind: local, config: {} }
+steps:
+  - call: _arvel/status
+    expect: { state: ready }
+  - call: session/new
+    params: { cwd: "/x", mcpServers: [] }
+    expectError: { code: -32601 }
+  - call: _arvel/route/plan
+    params:
+      task: { title: "Add a feature flag" }
+      types:
+        - { typeId: feature, name: Feature, roles: { developer: on, security: auto, tester: off, lead_accept: on } }
+        - { typeId: bug, name: Bug, roles: { developer: on, tester: optional } }
+      roles:
+        - { slot: developer, roleId: developer, name: Developer, description: "Writes code by the plan", kind: code }
+        - { slot: security, roleId: security, name: Security, description: "Checks authentication", kind: check }
+        - { slot: tester, roleId: tester, name: Tester, description: "Runs tests and browser checks", kind: check }
+        - { slot: lead_accept, roleId: lead, name: Lead, description: "Accepts the result", kind: accept }
+    expect:
+      type: { typeId: feature, confidence: 0.9 }
+  - call: _arvel/route/message
+    params:
+      task: { title: "Add a feature flag" }
+      message: "ask the tester"
+      currentRoleId: developer
+      candidates:
+        - { roleId: tester, name: Tester, kind: check }
+        - { roleId: developer, name: Developer, kind: code }
+    expect: { roleId: tester, confidence: 0.9 }
+  - call: _arvel/route/effort
+    params: { text: "short", roleId: developer, kind: code, levels: [low, high] }
+    expect: { effort: low, confidence: 0.6 }

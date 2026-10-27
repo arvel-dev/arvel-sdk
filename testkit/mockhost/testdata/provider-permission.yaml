@@ -1,0 +1,12 @@
+name: provider-permission
+plugin: {}
+initialize:
+  connection: { kind: local, config: {} }
+steps:
+  - call: session/new
+    params: { cwd: "{{tmpdir}}", mcpServers: [] }
+    save: { session: $.sessionId }
+  - call: session/prompt
+    params: { sessionId: "{{session}}", prompt: [ { type: text, text: "run" } ] }
+    answerPermissions: allow_once
+    expect: { stopReason: end_turn }
