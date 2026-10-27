@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
+  "id": "mcpstub",
+  "name": "MCP stub integration",
+  "type": "integration",
+  "version": "0.0.0",
+  "pluginApi": "1",
+  "description": "Test-only integration plugin backed by the mcpstub MCP server.",
+  "license": "Apache-2.0",
+  "entry": { "command": ["mcpstub"] },
+  "permissions": { "spawn": ["mcpstub"] },
+  "requires": [{ "binary": "mcpstub" }],
+  "contributes": {
+    "mcpServers": [
+      {
+        "name": "stub",
+        "command": ["{bin}"],
+        "tools": ["alpha", "beta"]
+      }
+    ]
+  }
+}

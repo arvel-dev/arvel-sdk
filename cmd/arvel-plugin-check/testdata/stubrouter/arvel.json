@@ -1,0 +1,27 @@
+{
+  "$schema": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
+  "id": "stubrouter",
+  "name": "Stub router",
+  "type": "router",
+  "version": "0.0.0",
+  "pluginApi": "1",
+  "description": "Test-only router that fails one conformance check per STUB_MODE.",
+  "license": "Apache-2.0",
+  "entry": { "command": ["stubrouter"] },
+  "permissions": {},
+  "connections": [
+    {
+      "kind": "local",
+      "label": "Local stub",
+      "billing": "unknown",
+      "config": { "type": "object", "properties": {} },
+      "secrets": []
+    }
+  ],
+  "capabilities": {
+    "router": {
+      "features": ["route.plan", "route.message", "route.effort", "route.explain"],
+      "maxLatencyMs": 3000
+    }
+  }
+}

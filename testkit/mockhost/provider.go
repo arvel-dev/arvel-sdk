@@ -105,3 +105,18 @@ func (c *core) Updates(id string) []map[string]any {
 	copy(out, c.updates[id])
 	return out
 }
+
+// snapshotUpdates returns a copy of every collected session/update, keyed by
+// session id. It is used to expose the plugin's streamed output to a caller
+// that does not know the session ids ahead of time.
+func (c *core) snapshotUpdates() map[string][]map[string]any {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make(map[string][]map[string]any, len(c.updates))
+	for id, ups := range c.updates {
+		cp := make([]map[string]any, len(ups))
+		copy(cp, ups)
+		out[id] = cp
+	}
+	return out
+}

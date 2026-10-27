@@ -193,11 +193,26 @@ func (c *core) InitializeCtx(ctx context.Context, meta protocol.InitMeta) (proto
 // waits for the plugin to exit. Closing stdin also unblocks the procx stdin
 // forwarding goroutine, without which cmd.Wait would hang.
 func (c *core) shutdown() error {
+	_, err := c.shutdownExit(5 * time.Second)
+	return err
+}
+
+// shutdownExit sends _arvel/shutdown, closes the plugin's stdin and waits up to
+// d for the plugin to exit, returning its exit code. A non-zero exit is not an
+// error: the caller decides which exit codes are acceptable. An in-process
+// plugin has no process, so its code is 0.
+func (c *core) shutdownExit(d time.Duration) (int, error) {
 	if err := c.peer.Notify(protocol.MethodShutdown, nil); err != nil {
-		return err
+		return -1, err
 	}
 	_ = c.stdinW.Close()
-	return c.waitDone(5 * time.Second)
+	if err := c.waitDone(d); err != nil {
+		return -1, err
+	}
+	if c.proc == nil {
+		return 0, nil
+	}
+	return c.proc.Wait()
 }
 
 // waitDone waits for the plugin process (or in-process Run) to exit.

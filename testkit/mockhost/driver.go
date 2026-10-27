@@ -3,6 +3,8 @@
 package mockhost
 
 import (
+	"time"
+
 	"github.com/arvel-dev/arvel-sdk/testkit/scenario"
 )
 
@@ -26,6 +28,13 @@ func StartDriver(binaryPath string, opts ...StartOption) (*Driver, error) {
 // plugin to exit, returning an error on failure or timeout.
 func (d *Driver) Shutdown() error {
 	return d.core.shutdown()
+}
+
+// ShutdownExit sends _arvel/shutdown and waits up to timeout for the plugin to
+// exit, returning its exit code. A non-zero exit is not an error; the caller
+// interprets the code.
+func (d *Driver) ShutdownExit(timeout time.Duration) (int, error) {
+	return d.core.shutdownExit(timeout)
 }
 
 // RunScenario runs one scenario against the driver and returns a structured

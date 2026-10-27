@@ -73,7 +73,7 @@ func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (Scenari
 		},
 	}
 
-	if _, err := c.Initialize(protocol.InitMeta{Connection: sc.Initialize.Connection}); err != nil {
+	if _, err := c.Initialize(protocol.InitMeta{Connection: sc.Initialize.Connection, Sandbox: opts.Sandbox}); err != nil {
 		return res, fmt.Errorf("mockhost: initialize: %w", err)
 	}
 
@@ -155,5 +155,6 @@ func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (Scenari
 		res.Steps = append(res.Steps, sr)
 		res.Pass = res.Pass && sr.Pass
 	}
+	res.Updates = c.snapshotUpdates()
 	return res, nil
 }
