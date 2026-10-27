@@ -5,6 +5,8 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"time"
 
 	acp "github.com/coder/acp-go-sdk"
@@ -45,11 +47,22 @@ func checkConcurrency(ctx context.Context, f *flags) CheckResult {
 		return fail("concurrency", "session/new 2: "+err.Error())
 	}
 	blocks := []acp.ContentBlock{acp.TextBlock("hi")}
-	if _, err := d.Prompt(s1, blocks); err != nil {
-		return fail("concurrency", "prompt A: "+err.Error())
+	// Both calls must be outstanding together. This function owns and joins
+	// both workers; Driver serializes only writes, not whole request/response
+	// exchanges. No checker lock is held across a driver call.
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for _, id := range []string{s1, s2} {
+		wg.Go(func() {
+			if _, err := d.Prompt(id, blocks); err != nil {
+				errs <- fmt.Errorf("prompt %s: %w", id, err)
+			}
+		})
 	}
-	if _, err := d.Prompt(s2, blocks); err != nil {
-		return fail("concurrency", "prompt B: "+err.Error())
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		return fail("concurrency", err.Error())
 	}
 	if _, err := d.Prompt(s1, blocks); err != nil {
 		return fail("concurrency", "prompt A (2nd): "+err.Error())

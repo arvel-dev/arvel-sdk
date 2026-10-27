@@ -18,6 +18,14 @@ func TestCheckConcurrency_EchoPasses(t *testing.T) {
 	}
 }
 
+func TestCheckConcurrency_RunsSessionsAtTheSameTime(t *testing.T) {
+	t.Setenv("STUB_MODE", "concurrency")
+	bin := buildBinary(t, "github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check/testdata/stubprovider", "stub")
+	if c := checkConcurrency(context.Background(), &flags{binary: bin}); c.Status != StatusPass {
+		t.Fatalf("concurrent sessions: %+v", c)
+	}
+}
+
 // Echo has no long-running turn, so cancel and busy cannot be strictly
 // asserted: they may only skip, never fail.
 func TestCheckCancelBusy_EchoSkips(t *testing.T) {

@@ -30,11 +30,12 @@ func checkRouteValidity(ctx context.Context, f *flags) CheckResult {
 		return fail("route validity", "start: "+err.Error())
 	}
 	defer d.Close()
-	if _, err := d.Initialize(releaseInitMeta()); err != nil {
+	init, err := d.Initialize(releaseInitMeta())
+	if err != nil {
 		return fail("route validity", "initialize: "+err.Error())
 	}
 	rng := rand.New(rand.NewSource(1)) // seeded for reproducibility
-	return checkRouteValidityRequests(ctx, d, rng)
+	return checkRouteValidityRequests(ctx, d, rng, init.Features)
 }
 
 // checkRouteValidityRequests sends randomizedRequests route requests and asserts
@@ -42,10 +43,19 @@ func checkRouteValidity(ctx context.Context, f *flags) CheckResult {
 // the request, confidence in [0, 1], finite explain values). A single invalid
 // response is collected, not fatal; every request is tried unless the transport
 // itself dies.
-func checkRouteValidityRequests(ctx context.Context, d *mockhost.Driver, rng *rand.Rand) CheckResult {
+func checkRouteValidityRequests(ctx context.Context, d *mockhost.Driver, rng *rand.Rand, features []string) CheckResult {
+	var methods []string
+	for _, feature := range features {
+		if isRouterFeature(feature) {
+			methods = append(methods, "_arvel/"+strings.ReplaceAll(feature, ".", "/"))
+		}
+	}
+	if len(methods) == 0 {
+		return fail("route validity", "no route features announced")
+	}
 	var violations []string
 	for i := 0; i < randomizedRequests; i++ {
-		name, err := oneRandomRoute(ctx, d, rng, i)
+		name, err := oneRandomRoute(ctx, d, rng, methods[i%len(methods)])
 		if err != nil {
 			violations = append(violations, fmt.Sprintf("%s #%d: %v", name, i+1, err))
 		}
@@ -63,23 +73,23 @@ func checkRouteValidityRequests(ctx context.Context, d *mockhost.Driver, rng *ra
 // oneRandomRoute sends one randomized route request (cycling through the four
 // route methods) and returns its method label and any validation or deadline
 // error.
-func oneRandomRoute(ctx context.Context, d *mockhost.Driver, rng *rand.Rand, i int) (string, error) {
-	switch i % 4 {
-	case 0:
+func oneRandomRoute(ctx context.Context, d *mockhost.Driver, rng *rand.Rand, method string) (string, error) {
+	switch method {
+	case protocol.MethodRoutePlan:
 		req := randomPlan(rng)
 		var res protocol.RoutePlanResult
 		if err := callRoute(ctx, d, protocol.MethodRoutePlan, req, &res); err != nil {
 			return "route/plan", err
 		}
 		return "route/plan", res.Validate(req)
-	case 1:
+	case protocol.MethodRouteMessage:
 		req := randomMessage(rng)
 		var res protocol.RouteMessageResult
 		if err := callRoute(ctx, d, protocol.MethodRouteMessage, req, &res); err != nil {
 			return "route/message", err
 		}
 		return "route/message", res.Validate(req)
-	case 2:
+	case protocol.MethodRouteEffort:
 		req := randomEffort(rng)
 		var res protocol.RouteEffortResult
 		if err := callRoute(ctx, d, protocol.MethodRouteEffort, req, &res); err != nil {
@@ -114,15 +124,6 @@ func callRoute(ctx context.Context, d *mockhost.Driver, method string, params, r
 // The fixed roster the randomized requests draw from. Every combination stays
 // within what PROTOCOL §14 defines so a conformant router can always answer.
 var (
-	routeTypes = []protocol.RouteType{
-		{TypeID: protocol.TypeFeature, Name: "Feature", Roles: map[string]protocol.SlotState{
-			protocol.SlotDeveloper: protocol.SlotStateOn, protocol.SlotSecurity: protocol.SlotStateAuto,
-			protocol.SlotTester: protocol.SlotStateOff, protocol.SlotLeadAccept: protocol.SlotStateOn,
-		}},
-		{TypeID: protocol.TypeBug, Name: "Bug", Roles: map[string]protocol.SlotState{
-			protocol.SlotDeveloper: protocol.SlotStateOn, protocol.SlotTester: protocol.SlotStateOptional,
-		}},
-	}
 	routeRoles = []protocol.RouteRole{
 		{Slot: protocol.SlotDeveloper, RoleID: protocol.RoleDeveloper, Name: "Developer", Description: "Writes code by the plan", Kind: protocol.RoleKindCode},
 		{Slot: protocol.SlotSecurity, RoleID: protocol.RoleSecurity, Name: "Security", Description: "Checks authentication", Kind: protocol.RoleKindCheck},
@@ -150,11 +151,28 @@ var (
 )
 
 func randomPlan(rng *rand.Rand) protocol.RoutePlanParams {
-	return protocol.RoutePlanParams{
-		Task:  routeTasks[rng.Intn(len(routeTasks))],
-		Types: routeTypes,
-		Roles: routeRoles,
+	roleCount := 3 + rng.Intn(10)
+	roles := []protocol.RouteRole{
+		routeRoles[0], routeRoles[1],
+		{Slot: "conformance:docs-writer", RoleID: "conformance:docs-writer", Name: "Docs writer", Description: "Writes documentation", Kind: protocol.RoleKindCode},
 	}
+	for len(roles) < roleCount {
+		id := fmt.Sprintf("conformance:reviewer-%d", len(roles))
+		roles = append(roles, protocol.RouteRole{Slot: id, RoleID: id, Name: "Reviewer", Kind: protocol.RoleKindCheck})
+	}
+	types := make([]protocol.RouteType, 1+rng.Intn(8))
+	states := []protocol.SlotState{protocol.SlotStateOn, protocol.SlotStateOff, protocol.SlotStateOptional}
+	for i := range types {
+		types[i] = protocol.RouteType{TypeID: fmt.Sprintf("conformance:type-%d", i), Name: fmt.Sprintf("Type %d", i), Roles: map[string]protocol.SlotState{}}
+		for _, role := range roles {
+			state := states[rng.Intn(len(states))]
+			if role.Slot == protocol.SlotSecurity && rng.Intn(2) == 0 {
+				state = protocol.SlotStateAuto
+			}
+			types[i].Roles[role.Slot] = state
+		}
+	}
+	return protocol.RoutePlanParams{Task: routeTasks[rng.Intn(len(routeTasks))], Types: types, Roles: roles}
 }
 
 func randomMessage(rng *rand.Rand) protocol.RouteMessageParams {

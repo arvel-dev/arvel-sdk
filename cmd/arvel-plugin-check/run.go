@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"fmt"
 	"io"
 
@@ -15,6 +17,9 @@ import (
 // and 2 on a usage or flag error.
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	f, err := parseFlags(args, stderr)
+	if errors.Is(err, flag.ErrHelp) {
+		return 0
+	}
 	if err != nil {
 		return 2 // parseFlags already printed the error and usage
 	}

@@ -75,7 +75,7 @@ func routerBasic(ctx context.Context, f *flags, m *manifest.Manifest) []CheckRes
 	}
 
 	out = append(out, checkStderrJSON(d))
-	out = append(out, checkCanaryLeak(canary, d.Stderr()))
+	out = append(out, checkCanaryLeak(canary, d.Stdout()+d.Stderr()))
 	redactDetails(out, canary)
 	return out
 }
@@ -96,6 +96,8 @@ func routerRelease(ctx context.Context, f *flags) []CheckResult {
 // plugin reached the initialized state, so dependents can be skipped on a wire
 // error but still run on a merely non-conformant result.
 func checkRouterInitialize(ctx context.Context, d *mockhost.Driver, meta protocol.InitMeta) (CheckResult, bool) {
+	ctx, cancel := context.WithTimeout(ctx, initTimeout)
+	defer cancel()
 	if meta.PluginAPI == "" {
 		meta.PluginAPI = protocol.PluginAPI
 	}
@@ -150,8 +152,10 @@ func isRouterFeature(f string) bool {
 // checkSessionNewRejected asserts a router answers session/new with -32601
 // (routers have no session surface, PROTOCOL §14.1).
 func checkSessionNewRejected(d *mockhost.Driver) CheckResult {
+	ctx, cancel := context.WithTimeout(context.Background(), initTimeout)
+	defer cancel()
 	var res any
-	err := d.Call(context.Background(), protocol.MethodSessionNew, map[string]any{"cwd": "/x", "mcpServers": []any{}}, &res)
+	err := d.Call(ctx, protocol.MethodSessionNew, map[string]any{"cwd": "/x", "mcpServers": []any{}}, &res)
 	var rpcErr *protocol.RPCError
 	if !errors.As(err, &rpcErr) || rpcErr.Code != protocol.CodeMethodNotFound {
 		return fail("session/new", fmt.Sprintf("session/new must answer -32601, got %v", err))

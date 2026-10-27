@@ -103,7 +103,7 @@ func providerBasic(ctx context.Context, f *flags, m *manifest.Manifest) []CheckR
 	}
 
 	out = append(out, checkStderrJSON(d))
-	out = append(out, checkCanaryLeak(canary, d.Stderr()))
+	out = append(out, checkCanaryLeak(canary, d.Stdout()+d.Stderr()))
 	redactDetails(out, canary)
 	return out
 }
@@ -173,8 +173,10 @@ func checkModels(d *mockhost.Driver) CheckResult {
 }
 
 func checkUnknownMethod(d *mockhost.Driver) CheckResult {
+	ctx, cancel := context.WithTimeout(context.Background(), initTimeout)
+	defer cancel()
 	var raw any
-	err := d.Call(context.Background(), "_arvel/conformance_probe", map[string]any{}, &raw)
+	err := d.Call(ctx, "_arvel/conformance_probe", map[string]any{}, &raw)
 	var rpcErr *protocol.RPCError
 	if !errors.As(err, &rpcErr) || rpcErr.Code != protocol.CodeMethodNotFound {
 		return fail("unknown method", fmt.Sprintf("unknown _arvel/* method: want -32601, got %v", err))

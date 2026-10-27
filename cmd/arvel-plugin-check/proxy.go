@@ -17,11 +17,6 @@ import (
 	"github.com/arvel-dev/arvel-sdk/testkit/scenario"
 )
 
-// proxyVars is the set of environment variables the proxy check asserts. The
-// provider must forward sandbox.proxy into the first three and leave
-// SSH_AUTH_SOCK unset (PROTOCOL §15.4).
-var proxyVars = []string{"HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "NO_PROXY", "SSH_AUTH_SOCK"}
-
 // noProxyValue is the standard localhost exclusion set (PROTOCOL §15.3).
 const noProxyValue = "localhost,127.0.0.1"
 
