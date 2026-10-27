@@ -8,7 +8,16 @@ change the Go API; every such change carries a migration note. The protocol
 
 ## [Unreleased]
 
+### Fixed
+- `arvel-plugin-check` resolves relative executable paths and PATH commands
+  before launching provider/router checks, scenarios and proxy probes.
+- Standalone guide and release smoke tests now exercise relative binary paths;
+  copied workflows and guides pin the corrected SDK/checker version.
+
 ## [0.1.0] - 2026-10-28
+
+The tag exists, but release validation stopped before a GitHub release was
+created. Use v0.1.1 for the corrected checker and publishing workflow.
 
 ### Added
 - Author guides for provider, router, team and integration plugins, with

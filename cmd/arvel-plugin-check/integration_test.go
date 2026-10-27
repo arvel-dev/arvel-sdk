@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -97,6 +98,32 @@ func TestTeamSampleManifest(t *testing.T) {
 		if c := findCheckByName(rep.Checks, name); c == nil || c.Status != StatusPass {
 			t.Fatalf("check %q: %+v, want pass", name, c)
 		}
+	}
+}
+
+// Exercise the documented ./bin/plugin command shape rather than only passing
+// absolute paths returned by the test build helper.
+func TestRun_RelativeBinariesPassRelease(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds example binaries")
+	}
+	for _, kind := range []string{"echo", "echo-router"} {
+		t.Run(kind, func(t *testing.T) {
+			bin := buildBinary(t, "github.com/arvel-dev/arvel-sdk/examples/"+kind, kind)
+			manifestPath, err := filepath.Abs(repoPath("examples", kind, "arvel.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			scenarios, err := filepath.Abs(repoPath("examples", kind, "conformance"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Chdir(filepath.Dir(bin))
+			if _, err := os.Stat(filepath.Base(bin)); err != nil {
+				t.Fatal(err)
+			}
+			runJSON(t, 0, "--level", "release", "--manifest", manifestPath, "--scenarios", scenarios, "--", "."+string(filepath.Separator)+filepath.Base(bin))
+		})
 	}
 }
 

@@ -63,7 +63,7 @@ func runProxyCheck(ctx context.Context, f *flags, dir string) CheckResult {
 	defer cleanup()
 
 	proxy := randomProxyURL()
-	d, err := mockhost.StartDriver(f.binary, mockhost.WithArgs(f.args...), mockhost.WithEnv(append(os.Environ(), env...)))
+	d, err := startDriverWithEnv(f, append(os.Environ(), env...))
 	if err != nil {
 		return fail("proxy", "start: "+err.Error())
 	}

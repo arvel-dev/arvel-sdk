@@ -31,5 +31,5 @@ jobs:
       - run: go build -o bin/plugin.exe .
         env:
           CGO_ENABLED: '0'
-      - run: go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.1.0
+      - run: go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.1.1
       - run: arvel-plugin-check --level basic --manifest arvel.json -- ./bin/plugin.exe

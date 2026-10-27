@@ -66,8 +66,13 @@ func TestRunProxyCheck_StubPasses(t *testing.T) {
 	}
 	t.Setenv("STUB_MODE", "proxy")
 	bin := buildBinary(t, "github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check/testdata/stubprovider", "stub")
-	f := &flags{binary: bin}
-	res := runProxyCheck(context.Background(), f, filepath.Join("testdata", "release", "conformance"))
+	scenarios, err := filepath.Abs(filepath.Join("testdata", "release", "conformance"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(filepath.Dir(bin))
+	f := &flags{binary: "." + string(filepath.Separator) + filepath.Base(bin)}
+	res := runProxyCheck(context.Background(), f, scenarios)
 	if res.Status != StatusPass {
 		t.Fatalf("status = %s, want pass (detail=%s)", res.Status, res.Detail)
 	}
