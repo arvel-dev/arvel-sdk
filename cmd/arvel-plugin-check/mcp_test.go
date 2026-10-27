@@ -47,7 +47,7 @@ func TestListTools_SilentStub(t *testing.T) {
 
 func TestListTools_MissingBinary(t *testing.T) {
 	_, err := listTools(context.Background(), []string{"/no/such/mcp-server"}, "")
-	if err == nil || !strings.Contains(err.Error(), "start") {
-		t.Fatalf("err = %v, want a start error", err)
+	if err == nil || (!strings.Contains(err.Error(), "start") && !strings.Contains(err.Error(), "resolve")) {
+		t.Fatalf("err = %v, want a process launch error", err)
 	}
 }

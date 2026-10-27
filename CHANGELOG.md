@@ -14,6 +14,8 @@ change the Go API; every such change carries a migration note. The protocol
   while respecting a router's announced features. Router initialization and
   unknown-method probes now have bounded waits.
 - `arvel-plugin-check --help` exits successfully.
+- Fake vendor builds, binary conformance tests and packaged MCP lookup use
+  executable filenames with `.exe` on Windows.
 
 ### Added
 - `testkit/mockhost` exposes captured raw protocol output through `Stdout()`.

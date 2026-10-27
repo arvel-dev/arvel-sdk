@@ -6,6 +6,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,9 @@ import (
 
 func buildBinary(t *testing.T, pkg, name string) string {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	out := filepath.Join(t.TempDir(), name)
 	cmd := exec.Command("go", "build", "-o", out, pkg)
 	if b, err := cmd.CombinedOutput(); err != nil {
