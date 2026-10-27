@@ -8,6 +8,12 @@ change the Go API; every such change carries a migration note. The protocol
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-28
+
+### Added
+- First published GitHub release with six-platform checker archives and
+  SHA-256 checksums.
+
 ### Fixed
 - `arvel-plugin-check` resolves relative executable paths and PATH commands
   before launching provider/router checks, scenarios and proxy probes.
