@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  quality:
+    uses: ./.github/workflows/ci.yml
+  release:
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build the local checker and examples
+        run: |
+          go build -o bin/arvel-plugin-check ./cmd/arvel-plugin-check
+          go build -o bin/echo ./examples/echo
+          go build -o bin/echo-router ./examples/echo-router
+        env:
+          CGO_ENABLED: '0'
+      - name: Provider release conformance
+        run: ./bin/arvel-plugin-check --level release --manifest examples/echo/arvel.json --scenarios examples/echo/conformance -- ./bin/echo
+      - name: Router release conformance
+        run: ./bin/arvel-plugin-check --level release --manifest examples/echo-router/arvel.json --scenarios examples/echo-router/conformance -- ./bin/echo-router
+      - name: Declarative conformance
+        run: ./bin/arvel-plugin-check --manifest examples/team-sample/arvel.json --package examples/team-sample
+      - name: Require versioned release notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: sh scripts/release-notes.sh "${RELEASE_TAG#v}" > "$RUNNER_TEMP/release-notes.md"
+      - name: Package six targets and create the draft
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: v2.19.0
+          args: release --clean --release-notes=${{ runner.temp }}/release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
