@@ -73,6 +73,27 @@ change the Go API; every such change carries a migration note. The protocol
   router in-process or as a binary and runs scenario files.
 - `examples/echo`: an in-memory provider (kind `local`, model `echo-1`) that
   streams word by word, asks permission on `!run`, and supports cancel and resume.
+- `cmd/arvel-plugin-check`: the conformance CLI of SPEC §5.10. `--level basic`
+  and `--level release` for provider and router plugins, `--manifest`/`--package`
+  for declarative `team`/`integration` plugins, `--scenarios` for YAML scenario
+  runs and `--json` for a machine-readable report; the exit code is 0 when every
+  non-skipped check passed, 1 on any failure and 2 on a usage error. Provider
+  `basic` validates the manifest, bounds `initialize` at 5 s, checks the
+  `_arvel/status` and `_arvel/models` shapes, expects `-32601` for an unknown
+  `_arvel/*` method, requires `_arvel/shutdown` to exit 0 within 10 s, checks
+  that stderr is JSON lines and injects a canary secret into `initialize` and
+  greps all captured output for it. `release` adds the `--scenarios` runs,
+  concurrency, cancel and busy probes and the sandbox proxy test. Routers get
+  the §14.9 suite (empty `agentCapabilities`, router-only features,
+  `session/new` → `-32601`, id/slot/confidence validity, a 100-request randomized
+  validity check under a 3 s deadline). `--manifest`/`--package` runs the §16.5
+  checks with no binary; `release` for an `integration` plugin also starts a
+  stdio MCP server and lists its tools.
+- `testkit/mockhost`: `Driver` and `StartDriver`, an error-returning binary
+  driver for non-test callers (the `testing.TB`-bound `Host` is unchanged), and
+  `Driver.RunScenario` with the structured `ScenarioResult`/`StepResult`.
+- `testkit/fakevendor`: an `emit: {env: NAME}` script step, so a conformance
+  scenario can make the fake vendor report an environment variable.
 
 ### Changed
 - `docs/PROTOCOL.md` synced with the workspace sandbox (S7): new §15 Workspace
