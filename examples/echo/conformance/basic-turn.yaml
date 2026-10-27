@@ -1,0 +1,18 @@
+name: echo-basic-turn
+plugin: {}
+initialize:
+  connection: { kind: local, config: {} }
+steps:
+  - call: _arvel/status
+    expect: { state: ready }
+  - call: _arvel/models
+    params: { refresh: false }
+    expect: { default: echo-1 }
+  - call: session/new
+    params: { cwd: "{{tmpdir}}", mcpServers: [], _meta: { arvel: { model: echo-1 } } }
+    save: { session: $.sessionId }
+  - call: session/prompt
+    params: { sessionId: "{{session}}", prompt: [ { type: text, text: "hello world" } ] }
+    expectUpdates:
+      - sessionUpdate: agent_message_chunk
+    expect: { stopReason: end_turn }

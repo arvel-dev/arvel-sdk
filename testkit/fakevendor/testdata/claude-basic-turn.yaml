@@ -1,0 +1,8 @@
+name: claude-basic-turn
+version: "2.1.310"
+authStatus: '{"status":"signed_in","account":"me@example.com"}'
+steps:
+  - emit: { stream: stdout, line: '{"type":"system","subtype":"init"}' }
+  - expect: { json: { type: "assistant" } }
+  - emit: { stream: stdout, line: '{"type":"result","subtype":"success","result":"ok"}' }
+  - exitCode: 0

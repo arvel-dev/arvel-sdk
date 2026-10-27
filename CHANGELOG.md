@@ -65,6 +65,15 @@ change the Go API; every such change carries a migration note. The protocol
   sure a read-only task never has edit access.
 - `examples/echo-router` and `examples/team-sample`.
 
+- `testkit/scenario` package: the YAML scenario format shared by tests and
+  `arvel-plugin-check` (value templating, JSONPath saves, subset assertions).
+- `testkit/fakevendor` package: builds a fake vendor CLI from a script, for
+  testing a provider without the real vendor CLI.
+- `testkit/mockhost` package: a scripted ACP client that drives a provider or
+  router in-process or as a binary and runs scenario files.
+- `examples/echo`: an in-memory provider (kind `local`, model `echo-1`) that
+  streams word by word, asks permission on `!run`, and supports cancel and resume.
+
 ### Changed
 - `docs/PROTOCOL.md` synced with the workspace sandbox (S7): new §15 Workspace
   sandbox, the manifest `sandbox` block, the `initialize` `sandbox` field, one
@@ -104,9 +113,13 @@ change the Go API; every such change carries a migration note. The protocol
 - New exported packages `protocol`, `manifest`, `schema`, `jsonl`, `redact`,
   `logx`, `procx`, `jsonrpc`, `plugin` and `protocol/skills`. Except for the items
   marked **BREAKING:** under Changed and Removed, all changes are additive.
+- New exported packages `testkit/scenario`, `testkit/fakevendor` and
+  `testkit/mockhost`, and the `examples/echo` provider (MIT-0).
 - New exported API of `protocol` and `manifest` as listed under Added.
 - New dependencies: `github.com/santhosh-tekuri/jsonschema/v6` and
   `golang.org/x/mod` (plus `golang.org/x/text`, which `jsonschema` needs), and
   `golang.org/x/sys` (used only by the Windows code of `procx`).
 - New dependency: `github.com/coder/acp-go-sdk` (ACP schema types only; it adds no
   further modules).
+- New dependency: `gopkg.in/yaml.v3` (the YAML scenario format of `testkit`;
+  imported only by `testkit` and `cmd`, not by the runtime plugin packages).

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/arvel-dev/arvel-sdk/manifest"
 	"github.com/arvel-dev/arvel-sdk/plugin"
 	"github.com/arvel-dev/arvel-sdk/protocol"
+	"github.com/arvel-dev/arvel-sdk/testkit/mockhost"
 )
 
 func TestManifestIsValid(t *testing.T) {
@@ -111,3 +114,30 @@ func TestRouterInProcess(t *testing.T) {
 }
 
 func asRPC(err error, target **protocol.RPCError) bool { return errors.As(err, target) }
+
+func TestRouterScenarios(t *testing.T) {
+	h := mockhost.InProcessRouter(t, router{})
+	h.RunScenario(t, "conformance/plan.yaml")
+	h.Shutdown()
+}
+
+func TestRouterScenariosBinary(t *testing.T) {
+	if testing.Short() {
+		t.Skip("go build of the example binary")
+	}
+	bin := buildBinary(t, "github.com/arvel-dev/arvel-sdk/examples/echo-router", "echo-router")
+	h := mockhost.Start(t, bin)
+	h.RunScenario(t, "conformance/plan.yaml")
+	h.Shutdown()
+}
+
+// buildBinary compiles a package into a temporary executable and returns its path.
+func buildBinary(t *testing.T, pkg, name string) string {
+	t.Helper()
+	out := filepath.Join(t.TempDir(), name)
+	cmd := exec.Command("go", "build", "-o", out, pkg)
+	if b, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build %s: %v\n%s", pkg, err, b)
+	}
+	return out
+}

@@ -1,0 +1,15 @@
+name: provider-basic
+plugin: {}
+initialize:
+  connection: { kind: local, config: {} }
+steps:
+  - call: _arvel/status
+    expect: { state: ready }
+  - call: session/new
+    params: { cwd: "{{tmpdir}}", mcpServers: [], _meta: { arvel: { model: m1 } } }
+    save: { session: $.sessionId }
+  - call: session/prompt
+    params: { sessionId: "{{session}}", prompt: [ { type: text, text: "hi" } ] }
+    expectUpdates:
+      - sessionUpdate: agent_message_chunk
+    expect: { stopReason: end_turn }
