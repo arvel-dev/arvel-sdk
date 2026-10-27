@@ -69,9 +69,9 @@ func TestProviderBasic_StubFailures(t *testing.T) {
 		t.Skip("go build of the stub binary")
 	}
 	cases := []struct {
-		mode    string
-		check   string
-		detail  string
+		mode   string
+		check  string
+		detail string
 	}{
 		// The stub is built on the SDK, so the plugin framework validates the
 		// models result before it reaches the wire and answers a generic -32000

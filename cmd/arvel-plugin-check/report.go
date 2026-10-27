@@ -77,6 +77,12 @@ func renderJSON(w io.Writer, r *Report) error {
 }
 
 // check helpers build a CheckResult concisely.
-func pass(name, detail string) CheckResult { return CheckResult{Name: name, Status: StatusPass, Detail: detail} }
-func fail(name, detail string) CheckResult { return CheckResult{Name: name, Status: StatusFail, Detail: detail} }
-func skip(name, detail string) CheckResult { return CheckResult{Name: name, Status: StatusSkip, Detail: detail} }
+func pass(name, detail string) CheckResult {
+	return CheckResult{Name: name, Status: StatusPass, Detail: detail}
+}
+func fail(name, detail string) CheckResult {
+	return CheckResult{Name: name, Status: StatusFail, Detail: detail}
+}
+func skip(name, detail string) CheckResult {
+	return CheckResult{Name: name, Status: StatusSkip, Detail: detail}
+}
