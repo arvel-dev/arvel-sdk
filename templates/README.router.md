@@ -70,7 +70,7 @@ internal packages. Use the public mockhost API in your own tests. Follow
 Use the binary packaging/CI/release templates and both scripts, then replace
 `project_name`, binary, all manifest asset entries and plugin identity together.
 The provider `templates/arvel.json` is not a router manifest: start with the
-router example's manifest instead. Pin checker `v0.1.1`.
+router example's manifest instead. Pin checker `v0.1.2`.
 
 ```sh
 go build -o bin/plugin .

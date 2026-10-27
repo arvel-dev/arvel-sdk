@@ -35,5 +35,3 @@ release:
   prerelease: auto
   extra_files:
     - glob: .release/arvel.json
-changelog:
-  disable: true

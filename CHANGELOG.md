@@ -8,11 +8,19 @@ change the Go API; every such change carries a migration note. The protocol
 
 ## [Unreleased]
 
+### Fixed
+- SDK and plugin releases now retain the exact versioned CHANGELOG notes passed
+  to GoReleaser instead of disabling the notes-loading stage.
+- Packaging validation covers a non-snapshot dry run so ignored custom notes
+  cannot silently produce an empty release description.
+
 ## [0.1.1] - 2026-10-28
 
+The draft was not published because release validation found an empty
+description. Use v0.1.2 for the complete release.
+
 ### Added
-- First published GitHub release with six-platform checker archives and
-  SHA-256 checksums.
+- Draft checker archives for six platforms with SHA-256 checksums.
 
 ### Fixed
 - `arvel-plugin-check` resolves relative executable paths and PATH commands

@@ -77,7 +77,7 @@ Start with the SDK's provider guide. Copy only `main.go`, `provider.go`,
 `session.go`, `arvel.json` and `conformance/` from `examples/echo`; the SDK tests
 have repository-specific build targets. Add your own tests using public testkit
 APIs. Rename the plugin in `main.go`, the manifest and `.goreleaser.yaml` together.
-Pin the SDK and checker to `v0.1.1`.
+Pin the SDK and checker to `v0.1.2`.
 
 ```sh
 go build -o bin/plugin .

@@ -86,16 +86,20 @@ func copyTree(t *testing.T, src, dst string) {
 // proxies; all module dependencies are already used by the SDK's own tests.
 func command(t *testing.T, dir, name string, args ...string) []byte {
 	t.Helper()
+	b, err := invoke(dir, name, args...)
+	if err != nil {
+		t.Fatalf("%s %v: %v\n%s", name, args, err, b)
+	}
+	return b
+}
+
+func invoke(dir, name string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOTOOLCHAIN=local", "GOPROXY=off", "GOSUMDB=off")
-	b, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("%s %v: %v\n%s", name, args, err, b)
-	}
-	return b
+	return cmd.CombinedOutput()
 }
 
 func standalone(t *testing.T, kind string) string {
@@ -239,6 +243,7 @@ func TestPackaging(t *testing.T) {
 				command(t, dir, "git", "add", ".")
 				noHooks := t.TempDir()
 				command(t, dir, "git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath="+noHooks, "commit", "-m", "test: standalone packaging fixture")
+				command(t, dir, "git", "tag", "v0.1.0")
 			}
 			var config map[string]any
 			if err := yaml.Unmarshal(read(t, configPath), &config); err != nil {
@@ -272,6 +277,22 @@ func TestPackaging(t *testing.T) {
 				}
 			}
 			verifyArtifacts(t, dir, dist, project, manifestBytes)
+
+			// Snapshots skip the changelog pipe. A non-snapshot dry run must
+			// actually consume --release-notes, even when publishing is skipped.
+			// If changelog.disable silently bypasses it, this wrongly succeeds.
+			config["dist"] = filepath.Join(t.TempDir(), "notes-dist")
+			b, err = yaml.Marshal(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			notesConfig := filepath.Join(t.TempDir(), "goreleaser.yaml")
+			write(t, notesConfig, b)
+			missing := filepath.Join(t.TempDir(), "missing-release-notes.md")
+			output, runErr := invoke(dir, tool, "release", "--skip=publish,validate", "--config", notesConfig, "--release-notes", missing)
+			if runErr == nil || !bytes.Contains(output, []byte(missing)) {
+				t.Fatalf("custom release notes were not consumed: err=%v\n%s", runErr, output)
+			}
 		})
 	}
 }
