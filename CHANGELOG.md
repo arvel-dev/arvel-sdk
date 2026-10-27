@@ -8,6 +8,12 @@ change the Go API; every such change carries a migration note. The protocol
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-28
+
+### Added
+- First published GitHub release with six-platform checker archives, SHA-256
+  checksums, and versioned release notes.
+
 ### Fixed
 - SDK and plugin releases now retain the exact versioned CHANGELOG notes passed
   to GoReleaser instead of disabling the notes-loading stage.
