@@ -8,14 +8,7 @@ change the Go API; every such change carries a migration note. The protocol
 
 ## [Unreleased]
 
-### Fixed
-- Conformance checks scan raw stdout as well as stderr for secret leakage, run
-  two sessions concurrently, and exercise plugin slots and varied task rosters
-  while respecting a router's announced features. Router initialization and
-  unknown-method probes now have bounded waits.
-- `arvel-plugin-check --help` exits successfully.
-- Fake vendor builds, binary conformance tests and packaged MCP lookup use
-  executable filenames with `.exe` on Windows.
+## [0.1.0] - 2026-10-28
 
 ### Added
 - Author guides for provider, router, team and integration plugins, with
@@ -29,7 +22,7 @@ change the Go API; every such change carries a migration note. The protocol
 - `docs/PROTOCOL.md`: the Arvel Provider Protocol v1, now the source of truth.
 - CI on Linux, macOS and Windows (`go vet`, `staticcheck`, `go test -race`) and a
   check that every `.go` file carries an SPDX licence header.
-- `docs/FINDINGS.md`: results of spike S0.1 (ACP SDK capabilities). Decision: the
+- `docs/FINDINGS.md`: ACP compatibility findings. The
   SDK ships its own `jsonrpc/` package, because `acp-go-sdk` limits lines to 10 MiB
   and the protocol requires 64 MiB; only its schema types are used.
 
@@ -89,7 +82,7 @@ change the Go API; every such change carries a migration note. The protocol
   router in-process or as a binary and runs scenario files.
 - `examples/echo`: an in-memory provider (kind `local`, model `echo-1`) that
   streams word by word, asks permission on `!run`, and supports cancel and resume.
-- `cmd/arvel-plugin-check`: the conformance CLI of SPEC §5.10. `--level basic`
+- `cmd/arvel-plugin-check`: the conformance CLI. `--level basic`
   and `--level release` for provider and router plugins, `--manifest`/`--package`
   for declarative `team`/`integration` plugins, `--scenarios` for YAML scenario
   runs and `--json` for a machine-readable report; the exit code is 0 when every
@@ -100,9 +93,9 @@ change the Go API; every such change carries a migration note. The protocol
   that stderr is JSON lines and injects a canary secret into `initialize` and
   greps all captured output for it. `release` adds the `--scenarios` runs,
   concurrency, cancel and busy probes and the sandbox proxy test. Routers get
-  the §14.9 suite (empty `agentCapabilities`, router-only features,
+  the router conformance suite (empty `agentCapabilities`, router-only features,
   `session/new` → `-32601`, id/slot/confidence validity, a 100-request randomized
-  validity check under a 3 s deadline). `--manifest`/`--package` runs the §16.5
+  validity check under a 3 s deadline). `--manifest`/`--package` runs declarative
   checks with no binary; `release` for an `integration` plugin also starts a
   stdio MCP server and lists its tools.
 - `testkit/mockhost`: `Driver` and `StartDriver`, an error-returning binary
@@ -111,8 +104,22 @@ change the Go API; every such change carries a migration note. The protocol
 - `testkit/fakevendor`: an `emit: {env: NAME}` script step, so a conformance
   scenario can make the fake vendor report an environment variable.
 
+- New exported packages `protocol`, `manifest`, `schema`, `jsonl`, `redact`,
+  `logx`, `procx`, `jsonrpc`, `plugin` and `protocol/skills`. Except for the items
+  marked **BREAKING:** under Changed and Removed, all changes are additive.
+- New exported packages `testkit/scenario`, `testkit/fakevendor` and
+  `testkit/mockhost`, and the `examples/echo` provider (MIT-0).
+- New exported API of `protocol` and `manifest` as listed under Added.
+- New dependencies: `github.com/santhosh-tekuri/jsonschema/v6` and
+  `golang.org/x/mod` (plus `golang.org/x/text`, which `jsonschema` needs), and
+  `golang.org/x/sys` (used only by the Windows code of `procx`).
+- New dependency: `github.com/coder/acp-go-sdk` (ACP schema types only; it adds no
+  further modules).
+- New dependency: `gopkg.in/yaml.v3` (the YAML scenario format of `testkit`;
+  imported only by `testkit` and `cmd`, not by the runtime plugin packages).
+
 ### Changed
-- `docs/PROTOCOL.md` synced with the workspace sandbox (S7): new §15 Workspace
+- `docs/PROTOCOL.md` synced with the workspace sandbox: new §15 Workspace
   sandbox, the manifest `sandbox` block, the `initialize` `sandbox` field, one
   provider process per connection and workspace, provider security rule 6 and the
   conformance note. The change is additive within `pluginApi: "1"`.
@@ -137,6 +144,15 @@ change the Go API; every such change carries a migration note. The protocol
   Migration: none for provider and router manifests.
 - `RoutePlanResult` and `RouteExplainResult` always write their lists as arrays.
 
+### Fixed
+- Conformance checks scan raw stdout as well as stderr for secret leakage, run
+  two sessions concurrently, and exercise plugin slots and varied task rosters
+  while respecting a router's announced features. Router initialization and
+  unknown-method probes now have bounded waits.
+- `arvel-plugin-check --help` exits successfully.
+- Fake vendor builds, binary conformance tests and packaged MCP lookup use
+  executable filenames with `.exe` on Windows.
+
 ### Removed
 - **BREAKING:** interactive terminal sessions: `InteractiveResult`,
   `InteractiveState` (with `InteractiveStateIdle`, `InteractiveStateBusy` and
@@ -145,18 +161,3 @@ change the Go API; every such change carries a migration note. The protocol
   and the feature `interactive` are reserved. Migration: delete the code that used
   them.
 - The manifest type `tool` is rejected; use `integration`.
-
-### API changes
-- New exported packages `protocol`, `manifest`, `schema`, `jsonl`, `redact`,
-  `logx`, `procx`, `jsonrpc`, `plugin` and `protocol/skills`. Except for the items
-  marked **BREAKING:** under Changed and Removed, all changes are additive.
-- New exported packages `testkit/scenario`, `testkit/fakevendor` and
-  `testkit/mockhost`, and the `examples/echo` provider (MIT-0).
-- New exported API of `protocol` and `manifest` as listed under Added.
-- New dependencies: `github.com/santhosh-tekuri/jsonschema/v6` and
-  `golang.org/x/mod` (plus `golang.org/x/text`, which `jsonschema` needs), and
-  `golang.org/x/sys` (used only by the Windows code of `procx`).
-- New dependency: `github.com/coder/acp-go-sdk` (ACP schema types only; it adds no
-  further modules).
-- New dependency: `gopkg.in/yaml.v3` (the YAML scenario format of `testkit`;
-  imported only by `testkit` and `cmd`, not by the runtime plugin packages).
