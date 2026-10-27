@@ -99,11 +99,13 @@ jobs:
           go-version-file: go.mod
       - name: Download module dependencies
         run: go mod download
-      - name: Install and check the pinned packaging tool
+      - name: Install the pinned packaging tool for subsequent steps
         uses: goreleaser/goreleaser-action@v6
         with:
           version: v2.19.0
-          args: check
+          install-only: true
+      - name: Check SDK packaging configuration
+        run: goreleaser check
       - name: Build snapshots and verify every archive and checksum
         run: go test -v ./internal/releasecheck -run Packaging -count=1
         env:
