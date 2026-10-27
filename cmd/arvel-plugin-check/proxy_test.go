@@ -12,10 +12,10 @@ import (
 func TestCheckProxyEnv(t *testing.T) {
 	const proxy = "http://127.0.0.1:41234"
 	correct := map[string]string{
-		"HTTPS_PROXY":  proxy,
-		"HTTP_PROXY":   proxy,
-		"ALL_PROXY":    proxy,
-		"NO_PROXY":     "localhost,127.0.0.1",
+		"HTTPS_PROXY":   proxy,
+		"HTTP_PROXY":    proxy,
+		"ALL_PROXY":     proxy,
+		"NO_PROXY":      "localhost,127.0.0.1",
 		"SSH_AUTH_SOCK": "",
 	}
 	cases := []struct {

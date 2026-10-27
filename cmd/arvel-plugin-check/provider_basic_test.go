@@ -6,6 +6,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,9 @@ import (
 
 func buildBinary(t *testing.T, pkg, name string) string {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	out := filepath.Join(t.TempDir(), name)
 	cmd := exec.Command("go", "build", "-o", out, pkg)
 	if b, err := cmd.CombinedOutput(); err != nil {
@@ -69,9 +73,9 @@ func TestProviderBasic_StubFailures(t *testing.T) {
 		t.Skip("go build of the stub binary")
 	}
 	cases := []struct {
-		mode    string
-		check   string
-		detail  string
+		mode   string
+		check  string
+		detail string
 	}{
 		// The stub is built on the SDK, so the plugin framework validates the
 		// models result before it reaches the wire and answers a generic -32000

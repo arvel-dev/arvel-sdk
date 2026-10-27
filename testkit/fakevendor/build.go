@@ -63,6 +63,9 @@ func Build(ctx context.Context, s *Script, name string) (string, func(), error) 
 		return fail(err)
 	}
 
+	if runtime.GOOS == "windows" && filepath.Ext(name) != ".exe" {
+		name += ".exe"
+	}
 	out := filepath.Join(dir, name)
 	cmd := exec.CommandContext(ctx, "go", "build", "-mod=mod", "-o", out, ".")
 	cmd.Dir = dir

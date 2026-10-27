@@ -8,7 +8,17 @@ change the Go API; every such change carries a migration note. The protocol
 
 ## [Unreleased]
 
+### Fixed
+- Conformance checks scan raw stdout as well as stderr for secret leakage, run
+  two sessions concurrently, and exercise plugin slots and varied task rosters
+  while respecting a router's announced features. Router initialization and
+  unknown-method probes now have bounded waits.
+- `arvel-plugin-check --help` exits successfully.
+- Fake vendor builds, binary conformance tests and packaged MCP lookup use
+  executable filenames with `.exe` on Windows.
+
 ### Added
+- `testkit/mockhost` exposes captured raw protocol output through `Stdout()`.
 - Go module `github.com/arvel-dev/arvel-sdk` with a documented root package.
 - `docs/PROTOCOL.md`: the Arvel Provider Protocol v1, now the source of truth.
 - CI on Linux, macOS and Windows (`go vet`, `staticcheck`, `go test -race`) and a

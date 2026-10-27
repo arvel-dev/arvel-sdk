@@ -9,6 +9,7 @@ import (
 	"io"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 	"time"
@@ -134,6 +135,9 @@ func TestRouterScenariosBinary(t *testing.T) {
 // buildBinary compiles a package into a temporary executable and returns its path.
 func buildBinary(t *testing.T, pkg, name string) string {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	out := filepath.Join(t.TempDir(), name)
 	cmd := exec.Command("go", "build", "-o", out, pkg)
 	if b, err := cmd.CombinedOutput(); err != nil {

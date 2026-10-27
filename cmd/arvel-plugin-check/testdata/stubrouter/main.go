@@ -16,6 +16,7 @@ import (
 
 func main() {
 	mode := os.Getenv("STUB_MODE")
+	var canary string
 	enc := json.NewEncoder(os.Stdout)
 	sc := bufio.NewScanner(os.Stdin)
 	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
@@ -36,9 +37,24 @@ func main() {
 		}
 		switch msg.Method {
 		case "initialize":
+			var p struct {
+				Meta struct {
+					Arvel struct {
+						Connection struct {
+							Secrets map[string]string `json:"secrets"`
+						} `json:"connection"`
+					} `json:"arvel"`
+				} `json:"_meta"`
+			}
+			_ = json.Unmarshal(msg.Params, &p)
+			canary = p.Meta.Arvel.Connection.Secrets["conformance-canary"]
 			enc.Encode(initializeResponse(msg.ID, mode))
 		case "_arvel/status":
-			enc.Encode(ok(msg.ID, map[string]any{"state": "ready"}))
+			result := map[string]any{"state": "ready"}
+			if mode == "stdout-canary" {
+				result["extra"] = canary
+			}
+			enc.Encode(ok(msg.ID, result))
 		case "session/new":
 			if mode == "session-new" {
 				enc.Encode(ok(msg.ID, map[string]any{"sessionId": "s1"}))
@@ -59,10 +75,22 @@ func main() {
 				enc.Encode(ok(msg.ID, map[string]any{"type": nil, "roles": []any{}}))
 			}
 		case "_arvel/route/message":
+			if mode == "plan-only" {
+				enc.Encode(rpcErr(msg.ID, -32601, "method not found"))
+				continue
+			}
 			enc.Encode(ok(msg.ID, map[string]any{"roleId": firstCandidate(msg.Params), "confidence": 0.5}))
 		case "_arvel/route/effort":
+			if mode == "plan-only" {
+				enc.Encode(rpcErr(msg.ID, -32601, "method not found"))
+				continue
+			}
 			enc.Encode(ok(msg.ID, map[string]any{"effort": firstLevel(msg.Params), "confidence": 0.5}))
 		case "_arvel/route/explain":
+			if mode == "plan-only" {
+				enc.Encode(rpcErr(msg.ID, -32601, "method not found"))
+				continue
+			}
 			enc.Encode(ok(msg.ID, map[string]any{"lines": []map[string]any{{"text": "ok", "value": 0.5}}}))
 		default:
 			enc.Encode(rpcErr(msg.ID, -32601, "method not found"))

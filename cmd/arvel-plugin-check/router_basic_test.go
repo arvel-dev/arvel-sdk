@@ -79,3 +79,17 @@ func TestFirstNonRouterFeature(t *testing.T) {
 		t.Fatalf("isRouterFeature misclassifies a feature")
 	}
 }
+
+func TestRouterBasic_DetectsCanaryOnStdout(t *testing.T) {
+	t.Setenv("STUB_MODE", "stdout-canary")
+	bin := buildBinary(t, "github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check/testdata/stubrouter", "stubrouter")
+	cs := runRouterBasic(t, bin, filepath.Join("testdata", "stubrouter", "arvel.json"))
+	if c := findCheck(t, cs, "canary leak"); c.Status != StatusFail {
+		t.Fatalf("stdout secret leak was missed: %+v", c)
+	}
+	for _, c := range cs {
+		if strings.Contains(c.Detail, "arvel-canary-") {
+			t.Fatal("report leaked canary")
+		}
+	}
+}

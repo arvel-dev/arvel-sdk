@@ -122,7 +122,7 @@ func TestDeclarative_BinFallback(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(pkg, "arvel.json"), raw, 0o644); err != nil {
 		t.Fatalf("copy manifest: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(pkg, "mcpstub"), mustRead(t, bin), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(pkg, filepath.Base(bin)), mustRead(t, bin), 0o755); err != nil {
 		t.Fatalf("copy binary: %v", err)
 	}
 

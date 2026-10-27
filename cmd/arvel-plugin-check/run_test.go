@@ -38,3 +38,15 @@ func TestRun_MissingManifest(t *testing.T) {
 		t.Fatalf("stdout %q does not report a manifest failure", out.String())
 	}
 }
+
+func TestRun_HelpSucceeds(t *testing.T) {
+	for _, arg := range []string{"-h", "--help"} {
+		var out, errBuf bytes.Buffer
+		if code := run(context.Background(), []string{arg}, &out, &errBuf); code != 0 {
+			t.Fatalf("%s: code = %d, want 0", arg, code)
+		}
+		if !bytes.Contains(errBuf.Bytes(), []byte("Usage:")) {
+			t.Fatal("help did not print usage")
+		}
+	}
+}

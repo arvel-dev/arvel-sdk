@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/arvel-dev/arvel-sdk/manifest"
@@ -91,6 +92,9 @@ func checkMCPServers(ctx context.Context, f *flags, m *manifest.Manifest) []Chec
 	// {bin} fallback: the built plugin binary in the package directory, named
 	// after the manifest id (the sibling of arvel.json).
 	selfBin := filepath.Join(f.pkg, m.ID)
+	if runtime.GOOS == "windows" {
+		selfBin += ".exe"
+	}
 	var out []CheckResult
 	for _, s := range m.Contributes.MCPServers {
 		out = append(out, checkOneMCPServer(ctx, f, selfBin, s))

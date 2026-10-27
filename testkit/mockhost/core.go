@@ -31,6 +31,7 @@ type core struct {
 	permSeen     int
 
 	stderr     *syncBuffer
+	stdout     *syncBuffer
 	timeout    time.Duration
 	cancel     context.CancelFunc
 	peerCancel context.CancelFunc
@@ -48,6 +49,7 @@ func startCoreInProcess(run func(context.Context, []plugin.Option) error, opts [
 	s2cR, s2cW := io.Pipe() // plugin stdout -> mockhost
 	c := &core{
 		stderr:  &syncBuffer{},
+		stdout:  &syncBuffer{},
 		updates: map[string][]map[string]any{},
 		done:    make(chan struct{}),
 		timeout: defaultTimeout,
@@ -68,7 +70,7 @@ func startCoreInProcess(run func(context.Context, []plugin.Option) error, opts [
 		c.mu.Unlock()
 		close(c.done)
 	}()
-	c.peer = jsonrpc.NewPeer(s2cR, c2sW)
+	c.peer = jsonrpc.NewPeer(io.TeeReader(s2cR, c.stdout), c2sW)
 	c.registerHandlers()
 	c.peerDone = make(chan struct{})
 	peerCtx, peerCancel := context.WithCancel(context.Background())
@@ -87,6 +89,7 @@ func startCore(binaryPath string, opts ...StartOption) (*core, error) {
 	s2cR, s2cW := io.Pipe() // plugin stdout -> mockhost
 	c := &core{
 		stderr:  &syncBuffer{},
+		stdout:  &syncBuffer{},
 		updates: map[string][]map[string]any{},
 		done:    make(chan struct{}),
 		timeout: defaultTimeout,
@@ -113,7 +116,7 @@ func startCore(binaryPath string, opts ...StartOption) (*core, error) {
 		return nil, err
 	}
 	c.proc = proc
-	c.peer = jsonrpc.NewPeer(s2cR, c2sW)
+	c.peer = jsonrpc.NewPeer(io.TeeReader(s2cR, c.stdout), c2sW)
 	c.registerHandlers()
 	c.peerDone = make(chan struct{})
 	peerCtx, peerCancel := context.WithCancel(context.Background())
@@ -273,6 +276,12 @@ func (c *core) Close() {
 // Stderr returns the captured stderr text of the plugin process.
 func (c *core) Stderr() string {
 	return c.stderr.String()
+}
+
+// Stdout returns the raw protocol output read from the plugin, including
+// unknown fields and notifications that typed decoding would discard.
+func (c *core) Stdout() string {
+	return c.stdout.String()
 }
 
 // RunErr returns the error plugin.Run / plugin.RunRouter returned, if any.

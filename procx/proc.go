@@ -47,14 +47,14 @@ type Spec struct {
 // itself and honours its grace period). Descendants that leave the tree (a
 // daemon that calls setsid on Unix) are outside it.
 type Proc struct {
-	cmd      *exec.Cmd
-	pid      int
-	exited   chan struct{} // closed right after the root process is reaped
-	done     chan struct{} // closed last: status stored, tree cleaned, goroutines finished
-	exitCode int
-	waitErr  error
-	killOnce sync.Once
-	killing  atomic.Bool
+	cmd          *exec.Cmd
+	pid          int
+	exited       chan struct{} // closed right after the root process is reaped
+	done         chan struct{} // closed last: status stored, tree cleaned, goroutines finished
+	exitCode     int
+	waitErr      error
+	killOnce     sync.Once
+	killing      atomic.Bool
 	platformTree // per-OS state (see proc_unix.go, proc_windows.go)
 }
 

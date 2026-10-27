@@ -21,10 +21,11 @@ import (
 )
 
 type stub struct {
-	mode   string
-	canary string
-	proxy  string
-	next   atomic.Int64
+	mode    string
+	canary  string
+	proxy   string
+	next    atomic.Int64
+	prompts atomic.Int64
 }
 
 func (s *stub) Initialize(_ context.Context, in protocol.InitMeta) (plugin.Features, error) {
@@ -134,6 +135,22 @@ func (s *stubSession) ID() string { return s.id }
 
 func (s *stubSession) Prompt(ctx context.Context, _ []acp.ContentBlock, out plugin.Output) (plugin.TurnResult, error) {
 	switch s.stub.mode {
+	case "concurrency":
+		n := s.stub.prompts.Add(1)
+		if n == 1 {
+			deadline := time.NewTimer(time.Second)
+			defer deadline.Stop()
+			for s.stub.prompts.Load() < 2 {
+				select {
+				case <-deadline.C:
+					return plugin.TurnResult{}, fmt.Errorf("second session never ran concurrently")
+				case <-ctx.Done():
+					return plugin.TurnResult{}, ctx.Err()
+				case <-time.After(time.Millisecond):
+				}
+			}
+		}
+		return plugin.TurnResult{StopReason: acp.StopReasonEndTurn}, nil
 	case "block-prompt":
 		for {
 			if s.cancel.Load() {

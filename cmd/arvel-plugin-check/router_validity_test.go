@@ -4,10 +4,53 @@ package main
 
 import (
 	"context"
+	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestRandomPlan_CoversDeclaredRequestShapes(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	other := rand.New(rand.NewSource(1))
+	types, roles := map[int]bool{}, map[int]bool{}
+	for i := 0; i < 200; i++ {
+		p := randomPlan(rng)
+		if !reflect.DeepEqual(p, randomPlan(other)) {
+			t.Fatal("generation is not reproducible")
+		}
+		if err := p.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		types[len(p.Types)], roles[len(p.Roles)] = true, true
+		pluginSlot := false
+		for _, r := range p.Roles {
+			pluginSlot = pluginSlot || strings.Contains(r.Slot, ":")
+		}
+		if !pluginSlot {
+			t.Fatal("request has no plugin slot")
+		}
+	}
+	for n := 1; n <= 8; n++ {
+		if !types[n] {
+			t.Fatalf("no request with %d types", n)
+		}
+	}
+	for n := 3; n <= 12; n++ {
+		if !roles[n] {
+			t.Fatalf("no request with %d roles", n)
+		}
+	}
+}
+
+func TestCheckRouteValidity_PlanOnlyRouterPasses(t *testing.T) {
+	t.Setenv("STUB_MODE", "plan-only")
+	bin := buildBinary(t, "github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check/testdata/stubrouter", "stubrouter")
+	if c := checkRouteValidity(context.Background(), &flags{binary: bin}); c.Status != StatusPass {
+		t.Fatalf("plan-only router: %+v", c)
+	}
+}
 
 func TestCheckRouteValidity_EchoRouterPasses(t *testing.T) {
 	if testing.Short() {
