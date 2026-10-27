@@ -1,0 +1,9 @@
+name: proxy-check
+version: "0.0.0"
+steps:
+  - emit: { stream: stdout, env: HTTPS_PROXY }
+  - emit: { stream: stdout, env: HTTP_PROXY }
+  - emit: { stream: stdout, env: ALL_PROXY }
+  - emit: { stream: stdout, env: NO_PROXY }
+  - emit: { stream: stdout, env: SSH_AUTH_SOCK }
+  - exitCode: 0

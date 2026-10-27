@@ -22,16 +22,43 @@ func (h *Host) RunScenario(t testing.TB, file string) {
 	if err != nil {
 		t.Fatalf("mockhost: %v", err)
 	}
+	res, err := h.core.runScenario(sc, ScenarioOptions{
+		Tmpdir:        t.TempDir(),
+		FakevendorDir: filepath.Join(filepath.Dir(file), "..", "testdata", "fakevendor"),
+	})
+	if err != nil {
+		t.Fatalf("mockhost: %v", err)
+	}
+	if !res.Pass {
+		for _, s := range res.Steps {
+			if !s.Pass {
+				t.Fatalf("mockhost: scenario %s: step %q: %s", res.Name, s.Call, s.Err)
+			}
+		}
+	}
+}
 
+// runScenario runs a loaded scenario against the connection, returning a
+// structured result. err is non-nil only for scenario-authoring or
+// transport-level failures (bad params, a plugin that died mid-scenario); a
+// mismatching expectation is a failing step, not an error.
+func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (ScenarioResult, error) {
+	res := ScenarioResult{Name: sc.Name, Pass: true}
 	fv := map[string]string{} // name -> built fakevendor binary path
+	var cleanups []func()
+	defer func() {
+		for _, f := range cleanups {
+			f()
+		}
+	}()
 	resolver := scenario.Resolver{
 		Vars:   map[string]string{},
-		Tmpdir: t.TempDir(),
+		Tmpdir: opts.Tmpdir,
 		Fakevendor: func(name string) (string, error) {
 			if p, ok := fv[name]; ok {
 				return p, nil
 			}
-			script := filepath.Join(filepath.Dir(file), "..", "testdata", "fakevendor", name+".yaml")
+			script := filepath.Join(opts.FakevendorDir, name+".yaml")
 			s, err := fakevendor.LoadFile(script)
 			if err != nil {
 				return "", err
@@ -40,70 +67,93 @@ func (h *Host) RunScenario(t testing.TB, file string) {
 			if err != nil {
 				return "", err
 			}
-			t.Cleanup(cleanup)
+			cleanups = append(cleanups, cleanup)
 			fv[name] = bin
 			return bin, nil
 		},
 	}
 
-	if _, err := h.Initialize(protocol.InitMeta{Connection: sc.Initialize.Connection}); err != nil {
-		t.Fatalf("mockhost: initialize: %v", err)
+	if _, err := c.Initialize(protocol.InitMeta{Connection: sc.Initialize.Connection}); err != nil {
+		return res, fmt.Errorf("mockhost: initialize: %w", err)
 	}
 
 	var sessionID string
 	for i, step := range sc.Steps {
+		sr := StepResult{Call: step.Call, Pass: true}
 		params, err := resolver.Resolve(step.Params)
 		if err != nil {
-			t.Fatalf("mockhost: step %d params: %v", i, err)
+			sr.Pass = false
+			sr.Err = fmt.Sprintf("params: %v", err)
+			res.Steps = append(res.Steps, sr)
+			return res, fmt.Errorf("mockhost: step %d params: %w", i, err)
 		}
 		if step.AnswerPermissions != "" {
-			h.armPermission(step.AnswerPermissions)
+			c.armPermission(step.AnswerPermissions)
 		}
 
 		var result any
-		callErr := h.call(step.Call, params, &result)
-		h.disarmPermission()
+		callErr := c.call(step.Call, params, &result)
+		c.disarmPermission()
 
 		if step.ExpectError != nil {
 			var re *protocol.RPCError
-			if !errors.As(callErr, &re) {
-				t.Fatalf("mockhost: step %d (%s): expected error, got result %v", i, step.Call, result)
-			}
-			if re.Code != step.ExpectError.Code {
-				t.Fatalf("mockhost: step %d (%s): error code %d, want %d", i, step.Call, re.Code, step.ExpectError.Code)
-			}
-			if step.ExpectError.Arvel != "" {
+			switch {
+			case !errors.As(callErr, &re):
+				sr.Pass = false
+				sr.Err = fmt.Sprintf("expected error, got result %v", result)
+			case re.Code != step.ExpectError.Code:
+				sr.Pass = false
+				sr.Err = fmt.Sprintf("error code %d, want %d", re.Code, step.ExpectError.Code)
+			case step.ExpectError.Arvel != "":
 				d, ok := re.Arvel()
 				if !ok || string(d.Code) != step.ExpectError.Arvel {
-					t.Fatalf("mockhost: step %d (%s): arvel code %q, want %q", i, step.Call, d.Code, step.ExpectError.Arvel)
+					sr.Pass = false
+					sr.Err = fmt.Sprintf("arvel code %q, want %q", d.Code, step.ExpectError.Arvel)
 				}
 			}
+			res.Steps = append(res.Steps, sr)
+			res.Pass = res.Pass && sr.Pass
 			continue
 		}
 		if callErr != nil {
-			t.Fatalf("mockhost: step %d (%s): %v", i, step.Call, callErr)
+			sr.Pass = false
+			sr.Err = callErr.Error()
+			res.Steps = append(res.Steps, sr)
+			res.Pass = false
+			continue
 		}
 
 		if step.Expect != nil {
 			got, ok := result.(map[string]any)
 			if !ok || !scenario.Subset(step.Expect, got) {
-				t.Fatalf("mockhost: step %d (%s): result %v does not contain %v", i, step.Call, result, step.Expect)
+				sr.Pass = false
+				sr.Err = fmt.Sprintf("result %v does not contain %v", result, step.Expect)
 			}
 		}
-		for name, path := range step.Save {
-			v, ok := scenario.JSONPath(result, path)
-			if !ok {
-				t.Fatalf("mockhost: step %d (%s): JSONPath %q not found in %v", i, step.Call, path, result)
-			}
-			resolver.Vars[name] = fmt.Sprint(v)
-		}
-		if v, ok := resolver.Vars["session"]; ok {
-			sessionID = v
-		}
-		if len(step.ExpectUpdates) > 0 {
-			if err := scenario.MatchUpdates(h.Updates(sessionID), step.ExpectUpdates); err != nil {
-				t.Fatalf("mockhost: step %d (%s): %v", i, step.Call, err)
+		if sr.Pass {
+			for name, path := range step.Save {
+				v, ok := scenario.JSONPath(result, path)
+				if !ok {
+					sr.Pass = false
+					sr.Err = fmt.Sprintf("JSONPath %q not found in %v", path, result)
+					break
+				}
+				resolver.Vars[name] = fmt.Sprint(v)
 			}
 		}
+		if sr.Pass {
+			if v, ok := resolver.Vars["session"]; ok {
+				sessionID = v
+			}
+			if len(step.ExpectUpdates) > 0 {
+				if err := scenario.MatchUpdates(c.Updates(sessionID), step.ExpectUpdates); err != nil {
+					sr.Pass = false
+					sr.Err = err.Error()
+				}
+			}
+		}
+		res.Steps = append(res.Steps, sr)
+		res.Pass = res.Pass && sr.Pass
 	}
+	return res, nil
 }

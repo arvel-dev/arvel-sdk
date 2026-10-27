@@ -15,39 +15,39 @@ type PromptResult struct {
 }
 
 // Status answers _arvel/status.
-func (h *Host) Status() (protocol.Status, error) {
+func (c *core) Status() (protocol.Status, error) {
 	var res protocol.Status
-	err := h.call(protocol.MethodStatus, nil, &res)
+	err := c.call(protocol.MethodStatus, nil, &res)
 	return res, err
 }
 
 // Models answers _arvel/models.
-func (h *Host) Models(refresh bool) (protocol.ModelsResult, error) {
+func (c *core) Models(refresh bool) (protocol.ModelsResult, error) {
 	var res protocol.ModelsResult
-	err := h.call(protocol.MethodModels, map[string]any{"refresh": refresh}, &res)
+	err := c.call(protocol.MethodModels, map[string]any{"refresh": refresh}, &res)
 	return res, err
 }
 
 // Usage answers _arvel/usage.
-func (h *Host) Usage() (protocol.Usage, error) {
+func (c *core) Usage() (protocol.Usage, error) {
 	var res protocol.Usage
-	err := h.call(protocol.MethodUsage, nil, &res)
+	err := c.call(protocol.MethodUsage, nil, &res)
 	return res, err
 }
 
 // Action runs one _arvel/action.
-func (h *Host) Action(id string) (protocol.ActionResult, error) {
+func (c *core) Action(id string) (protocol.ActionResult, error) {
 	var res protocol.ActionResult
-	err := h.call(protocol.MethodAction, protocol.ActionParams{ID: id}, &res)
+	err := c.call(protocol.MethodAction, protocol.ActionParams{ID: id}, &res)
 	return res, err
 }
 
 // NewSession creates a session and returns its id.
-func (h *Host) NewSession(meta protocol.SessionMeta) (string, error) {
+func (c *core) NewSession(meta protocol.SessionMeta) (string, error) {
 	var res struct {
 		SessionID string `json:"sessionId"`
 	}
-	err := h.call(protocol.MethodSessionNew, map[string]any{
+	err := c.call(protocol.MethodSessionNew, map[string]any{
 		"cwd":        "/",
 		"mcpServers": []acp.McpServer{},
 		"_meta":      protocol.WithMeta(nil, meta),
@@ -56,8 +56,8 @@ func (h *Host) NewSession(meta protocol.SessionMeta) (string, error) {
 }
 
 // LoadSession resumes a session.
-func (h *Host) LoadSession(id string, meta protocol.SessionMeta) error {
-	return h.call(protocol.MethodSessionLoad, map[string]any{
+func (c *core) LoadSession(id string, meta protocol.SessionMeta) error {
+	return c.call(protocol.MethodSessionLoad, map[string]any{
 		"sessionId":  id,
 		"cwd":        "/",
 		"mcpServers": []acp.McpServer{},
@@ -66,12 +66,12 @@ func (h *Host) LoadSession(id string, meta protocol.SessionMeta) error {
 }
 
 // Prompt runs one turn and returns its stop reason and turn metadata.
-func (h *Host) Prompt(id string, blocks []acp.ContentBlock) (PromptResult, error) {
+func (c *core) Prompt(id string, blocks []acp.ContentBlock) (PromptResult, error) {
 	var raw struct {
 		StopReason acp.StopReason `json:"stopReason"`
 		Meta       map[string]any `json:"_meta"`
 	}
-	err := h.call(protocol.MethodSessionPrompt, map[string]any{"sessionId": id, "prompt": blocks}, &raw)
+	err := c.call(protocol.MethodSessionPrompt, map[string]any{"sessionId": id, "prompt": blocks}, &raw)
 	if err != nil {
 		return PromptResult{}, err
 	}
@@ -83,8 +83,8 @@ func (h *Host) Prompt(id string, blocks []acp.ContentBlock) (PromptResult, error
 }
 
 // SetConfigOption changes a session config option.
-func (h *Host) SetConfigOption(id, configID, value string) error {
-	return h.call(protocol.MethodSessionSetConfigOption, map[string]any{
+func (c *core) SetConfigOption(id, configID, value string) error {
+	return c.call(protocol.MethodSessionSetConfigOption, map[string]any{
 		"sessionId": id,
 		"configId":  configID,
 		"value":     value,
@@ -92,16 +92,16 @@ func (h *Host) SetConfigOption(id, configID, value string) error {
 }
 
 // Cancel sends session/cancel for a session.
-func (h *Host) Cancel(id string) error {
-	return h.peer.Notify(protocol.MethodSessionCancel, map[string]any{"sessionId": id})
+func (c *core) Cancel(id string) error {
+	return c.peer.Notify(protocol.MethodSessionCancel, map[string]any{"sessionId": id})
 }
 
 // Updates returns the session/update objects collected for a session, in
 // arrival order. Each map is the decoded ACP SessionUpdate ("update" field).
-func (h *Host) Updates(id string) []map[string]any {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	out := make([]map[string]any, len(h.updates[id]))
-	copy(out, h.updates[id])
+func (c *core) Updates(id string) []map[string]any {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make([]map[string]any, len(c.updates[id]))
+	copy(out, c.updates[id])
 	return out
 }

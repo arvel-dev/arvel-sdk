@@ -86,6 +86,25 @@ steps:
 	}
 }
 
+func TestRun_Env(t *testing.T) {
+	t.Setenv("HTTPS_PROXY", "http://proxy:8080")
+	// Empty SSH_AUTH_SOCK reports an empty value (same as an absent var).
+	t.Setenv("SSH_AUTH_SOCK", "")
+	yaml := `name: x
+steps:
+  - emit: { stream: stdout, env: HTTPS_PROXY }
+  - emit: { stream: stdout, env: SSH_AUTH_SOCK }
+  - exitCode: 0
+`
+	out, _, code := run(t, yaml, nil, "")
+	if code != 0 {
+		t.Fatalf("code = %d", code)
+	}
+	if got, want := out, "HTTPS_PROXY=http://proxy:8080\nSSH_AUTH_SOCK=\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+}
+
 func TestRun_Regex(t *testing.T) {
 	yaml := `name: x
 steps:
