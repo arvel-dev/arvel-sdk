@@ -44,6 +44,13 @@ func read(t *testing.T, path string) []byte {
 	return b
 }
 
+// Markdown has the same meaning after Git's Windows CRLF checkout conversion.
+// Binary archives and checksum inputs deliberately continue using raw read.
+func markdown(t *testing.T, path string) []byte {
+	t.Helper()
+	return bytes.ReplaceAll(read(t, path), []byte("\r\n"), []byte("\n"))
+}
+
 func write(t *testing.T, path string, b []byte) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -110,7 +117,7 @@ func standalone(t *testing.T, kind string) string {
 	if kind == "echo-router" {
 		guide = "WRITING-A-ROUTER.md"
 	}
-	blocks := regexp.MustCompile("(?s)```go\n(.*?)```").FindAllSubmatch(read(t, filepath.Join(root, "docs", guide)), -1)
+	blocks := regexp.MustCompile("(?s)```go\n(.*?)```").FindAllSubmatch(markdown(t, filepath.Join(root, "docs", guide)), -1)
 	if len(blocks) == 0 {
 		t.Fatal("guide has no runnable Go test")
 	}
@@ -370,12 +377,16 @@ func archiveContents(t *testing.T, path string) map[string][]byte {
 
 func TestREADMETemplates_PrivacyAndProviderSections(t *testing.T) {
 	root := repoRoot(t)
-	protocol := string(read(t, filepath.Join(root, "docs/PROTOCOL.md")))
-	privacy := strings.SplitN(strings.SplitN(protocol, "### 14.2 What the host sends (privacy contract)\n\n", 2)[1], "\n\n", 2)[0]
-	if !strings.Contains(string(read(t, filepath.Join(root, "templates/README.router.md"))), privacy) {
+	protocol := string(markdown(t, filepath.Join(root, "docs/PROTOCOL.md")))
+	parts := strings.SplitN(protocol, "### 14.2 What the host sends (privacy contract)\n\n", 2)
+	if len(parts) != 2 {
+		t.Fatal("protocol has no routing privacy section")
+	}
+	privacy := strings.SplitN(parts[1], "\n\n", 2)[0]
+	if !strings.Contains(string(markdown(t, filepath.Join(root, "templates/README.router.md"))), privacy) {
 		t.Fatal("router privacy contract drifted")
 	}
-	provider := string(read(t, filepath.Join(root, "templates/README.plugin.md")))
+	provider := string(markdown(t, filepath.Join(root, "templates/README.plugin.md")))
 	for _, section := range []string{"What you need", "Connections", "Signing in", "Models & reasoning effort", "Permissions & safety", "Usage & limits", "Troubleshooting", "Privacy", "Compatibility", "Disclaimer", "Development", "License"} {
 		if !strings.Contains(provider, "## "+section+"\n") {
 			t.Errorf("provider template lacks %s", section)
