@@ -18,10 +18,10 @@ cp -R arvel-sdk/examples/echo-router/conformance arvel-plugin-myrouter/
 cp arvel-sdk/templates/LICENSE arvel-plugin-myrouter/
 cd arvel-plugin-myrouter
 go mod init github.com/YOUR_ORG/arvel-plugin-myrouter
-go get github.com/arvel-dev/arvel-sdk@v0.1.0
+go get github.com/arvel-dev/arvel-sdk@v0.1.1
 go mod tidy
 go build -o bin/router .
-go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.1.0
+go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.1.1
 arvel-plugin-check --level release --manifest arvel.json --scenarios conformance -- ./bin/router
 ```
 

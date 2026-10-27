@@ -138,7 +138,7 @@ func TestGuides_StandalonePluginsPassRelease(t *testing.T) {
 			command(t, dir, "go", "test", "-mod=mod", "./...")
 			bin := filepath.Join(dir, "plugin.exe")
 			command(t, dir, "go", "build", "-mod=mod", "-o", bin, ".")
-			b := command(t, dir, checker, "--json", "--level", "release", "--manifest", "arvel.json", "--scenarios", "conformance", "--", bin)
+			b := command(t, dir, checker, "--json", "--level", "release", "--manifest", "arvel.json", "--scenarios", "conformance", "--", "."+string(filepath.Separator)+filepath.Base(bin))
 			var report struct {
 				Failed int `json:"failed"`
 				Passed int `json:"passed"`

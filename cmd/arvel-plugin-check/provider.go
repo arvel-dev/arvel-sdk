@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -30,7 +32,21 @@ var (
 // checker's own environment, so env-selected test stubs and the plugin's normal
 // runtime variables are available).
 func startDriver(f *flags) (*mockhost.Driver, error) {
-	return mockhost.StartDriver(f.binary, mockhost.WithArgs(f.args...), mockhost.WithEnv(os.Environ()))
+	return startDriverWithEnv(f, os.Environ())
+}
+
+// Resolve CLI paths at the boundary; procx deliberately accepts only absolute
+// executable paths and never searches PATH or invokes a shell.
+func startDriverWithEnv(f *flags, env []string) (*mockhost.Driver, error) {
+	path, err := exec.LookPath(f.binary)
+	if err != nil {
+		return nil, fmt.Errorf("resolve plugin binary: %w", err)
+	}
+	path, err = filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolve plugin path: %w", err)
+	}
+	return mockhost.StartDriver(path, mockhost.WithArgs(f.args...), mockhost.WithEnv(env))
 }
 
 // runProvider runs the provider conformance suite against a binary.

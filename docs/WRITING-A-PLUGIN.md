@@ -21,10 +21,10 @@ cp -R arvel-sdk/examples/echo/conformance arvel-plugin-myagent/
 cp arvel-sdk/templates/LICENSE arvel-plugin-myagent/
 cd arvel-plugin-myagent
 go mod init github.com/YOUR_ORG/arvel-plugin-myagent
-go get github.com/arvel-dev/arvel-sdk@v0.1.0
+go get github.com/arvel-dev/arvel-sdk@v0.1.1
 go mod tidy
 go build -o bin/plugin .
-go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.1.0
+go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.1.1
 arvel-plugin-check --level release --manifest arvel.json --scenarios conformance -- ./bin/plugin
 ```
 
