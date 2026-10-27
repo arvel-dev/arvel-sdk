@@ -46,6 +46,8 @@ func TestValidate(t *testing.T) {
 		{"bad stream", "name: x\nsteps: [{emit: {stream: oops, line: A}}]\n"},
 		{"json and regex", "name: x\nsteps: [{expect: {json: {a: b}, regex: x}}]\n"},
 		{"bad regex", "name: x\nsteps: [{expect: {regex: '['}}]\n"},
+		{"line and env", "name: x\nsteps: [{emit: {line: A, env: HTTPS_PROXY}}]\n"},
+		{"neither line nor env", "name: x\nsteps: [{emit: {stream: stdout}}]\n"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

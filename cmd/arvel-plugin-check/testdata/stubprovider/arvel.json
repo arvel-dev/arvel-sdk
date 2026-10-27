@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
+  "id": "stubprovider",
+  "name": "Stub provider",
+  "type": "provider",
+  "version": "0.0.0",
+  "pluginApi": "1",
+  "description": "Test-only provider that fails one conformance check per STUB_MODE.",
+  "license": "Apache-2.0",
+  "entry": { "command": ["stubprovider"] },
+  "permissions": {},
+  "connections": [
+    {
+      "kind": "local",
+      "label": "Local stub",
+      "billing": "unknown",
+      "config": { "type": "object", "properties": {} },
+      "secrets": []
+    }
+  ]
+}

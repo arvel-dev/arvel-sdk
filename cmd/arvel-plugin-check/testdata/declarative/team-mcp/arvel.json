@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
+  "id": "team-with-mcp",
+  "name": "Team with MCP",
+  "type": "team",
+  "version": "0.1.0",
+  "pluginApi": "1",
+  "description": "Test-only team manifest that illegally declares an MCP server.",
+  "license": "MIT-0",
+  "contributes": {
+    "mcpServers": [
+      { "name": "nope", "url": "https://example.invalid/mcp" }
+    ],
+    "roles": [
+      {
+        "id": "docs-writer",
+        "name": { "en": "Docs writer" },
+        "description": {
+          "en": "Writes documentation under docs/ after the tests pass."
+        },
+        "kind": "code",
+        "placement": { "after": "tester" },
+        "instructions": { "en": "roles/docs-writer.en.md" },
+        "permissions": {
+          "read": "allow",
+          "edit": "ask",
+          "commands": { "default": "ask" },
+          "network": "deny"
+        },
+        "icon": "book"
+      }
+    ]
+  }
+}

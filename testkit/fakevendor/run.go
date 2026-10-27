@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"slices"
 	"time"
@@ -51,7 +52,11 @@ func Run(ctx context.Context, s *Script, argv []string, stdin io.Reader, stdout,
 			if st.Emit.Stream == "stderr" {
 				w = stderr
 			}
-			fmt.Fprintln(w, st.Emit.Line)
+			if st.Emit.Env != "" {
+				fmt.Fprintf(w, "%s=%s\n", st.Emit.Env, os.Getenv(st.Emit.Env))
+			} else {
+				fmt.Fprintln(w, st.Emit.Line)
+			}
 		case st.SleepMillis > 0:
 			t := time.NewTimer(time.Duration(st.SleepMillis) * time.Millisecond)
 			select {

@@ -45,7 +45,12 @@ type Expect struct {
 type Emit struct {
 	// Stream is "stdout" (default) or "stderr".
 	Stream string `yaml:"stream,omitempty"`
-	Line   string `yaml:"line"`
+	// Line is the literal line to write. Exactly one of Line and Env is set.
+	Line string `yaml:"line,omitempty"`
+	// Env makes the step emit "<Env>=<os.Getenv(Env)>", reporting the value of
+	// an environment variable (empty for an absent var). Exactly one of Line
+	// and Env is set.
+	Env string `yaml:"env,omitempty"`
 }
 
 // Load decodes a script from r. Unknown fields are an error.
@@ -104,8 +109,13 @@ func (s *Script) Validate() error {
 				errs = append(errs, fmt.Errorf("fakevendor: steps[%d].expect: %w", i, err))
 			}
 		}
-		if st.Emit != nil && st.Emit.Stream != "" && st.Emit.Stream != "stdout" && st.Emit.Stream != "stderr" {
-			errs = append(errs, fmt.Errorf("fakevendor: steps[%d].emit.stream %q is not stdout or stderr", i, st.Emit.Stream))
+		if st.Emit != nil {
+			if st.Emit.Stream != "" && st.Emit.Stream != "stdout" && st.Emit.Stream != "stderr" {
+				errs = append(errs, fmt.Errorf("fakevendor: steps[%d].emit.stream %q is not stdout or stderr", i, st.Emit.Stream))
+			}
+			if (st.Emit.Line == "") == (st.Emit.Env == "") {
+				errs = append(errs, fmt.Errorf("fakevendor: steps[%d].emit must set exactly one of line, env", i))
+			}
 		}
 	}
 	return errors.Join(errs...)

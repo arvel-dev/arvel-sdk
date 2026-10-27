@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
+  "id": "team-missing-file",
+  "name": "Team missing file",
+  "type": "team",
+  "version": "0.1.0",
+  "pluginApi": "1",
+  "description": "Test-only team manifest whose instruction file is not in the package.",
+  "license": "MIT-0",
+  "contributes": {
+    "roles": [
+      {
+        "id": "ghost-writer",
+        "name": { "en": "Ghost writer" },
+        "description": {
+          "en": "References roles/ghost.en.md, which is deliberately absent from this package."
+        },
+        "kind": "code",
+        "placement": { "after": "tester" },
+        "instructions": { "en": "roles/ghost.en.md" },
+        "permissions": {
+          "read": "allow",
+          "edit": "deny",
+          "commands": { "default": "deny" },
+          "network": "deny"
+        },
+        "icon": "book"
+      }
+    ]
+  }
+}

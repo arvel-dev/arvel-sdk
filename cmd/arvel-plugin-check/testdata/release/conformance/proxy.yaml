@@ -1,0 +1,13 @@
+name: proxy
+plugin:
+  env:
+    ARVEL_VENDOR: "{{fakevendor:proxy-check}}"
+initialize:
+  connection: { kind: local, config: {} }
+steps:
+  - call: session/new
+    params: { cwd: "{{tmpdir}}", mcpServers: [], _meta: { arvel: {} } }
+    save: { session: $.sessionId }
+  - call: session/prompt
+    params: { sessionId: "{{session}}", prompt: [ { type: text, text: "report env" } ] }
+    expect: { stopReason: end_turn }

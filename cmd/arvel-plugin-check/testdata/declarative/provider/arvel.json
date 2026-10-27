@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/arvel-dev/arvel-sdk/main/schema/arvel.schema.json",
+  "id": "declarative-provider",
+  "name": "Declarative fixture provider",
+  "type": "provider",
+  "version": "0.0.0",
+  "pluginApi": "1",
+  "description": "Test-only provider manifest fed to the declarative mode to prove it is rejected.",
+  "license": "Apache-2.0",
+  "entry": { "command": ["declarative-provider"] },
+  "permissions": {},
+  "connections": [
+    {
+      "kind": "local",
+      "label": "Local fixture",
+      "billing": "unknown",
+      "config": { "type": "object", "properties": {} },
+      "secrets": []
+    }
+  ]
+}
