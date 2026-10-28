@@ -39,6 +39,13 @@ the CLI enforces, which operations ask Arvel, and how a rejection or cancellatio
 stops the operation. Document sandbox vendor paths/hosts, process cleanup and the
 limits of enforcement. A permission declaration must match actual behavior.
 
+Describe delivery of enabled Arvel skills from this provider's own catalogue,
+their source/owner, and safe cleanup of session-owned copies. State whether
+external/global CLI skills remain visible and whether the tested CLI can disable
+them. If it cannot, disclose the limitation and expose no nonfunctional toggle.
+Space enable/disable/removal must preserve external originals and other active
+tasks' copies; skill availability does not change permissions or MCP policy.
+
 ## Usage & limits
 
 For each displayed number, identify its source, refresh rate, accuracy and what
@@ -77,7 +84,7 @@ Start with the SDK's provider guide. Copy only `main.go`, `provider.go`,
 `session.go`, `arvel.json` and `conformance/` from `examples/echo`; the SDK tests
 have repository-specific build targets. Add your own tests using public testkit
 APIs. Rename the plugin in `main.go`, the manifest and `.goreleaser.yaml` together.
-Pin the SDK and checker to `v0.1.2`.
+Pin the SDK and checker to `v0.1.3` for ownership-safe skill cleanup.
 
 ```sh
 go build -o bin/plugin .

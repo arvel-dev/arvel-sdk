@@ -3,6 +3,7 @@
 package skills
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -27,8 +28,8 @@ var (
 )
 
 const (
-	// markerFile marks a folder created by Materialize, so a stale copy of a
-	// crashed session is replaced and a repository's own skill is never removed.
+	// markerFile records a unique copy owner; its presence alone never proves
+	// that a copy is stale or safe to remove.
 	markerFile = ".arvel-materialized"
 	skillFile  = "SKILL.md"
 
@@ -132,11 +133,11 @@ func writeMarker(dir string) error {
 	if err != nil {
 		return fmt.Errorf("skills: marker in %s: %w", dir, err)
 	}
-	_, err = io.WriteString(f, "arvel-sdk skills.Materialize\n")
+	_, err = io.WriteString(f, "arvel-sdk skills.Materialize\n"+rand.Text()+"\n")
 	return closeAfter(f, err)
 }
 
-func hasMarker(dir string) bool {
-	fi, err := os.Stat(filepath.Join(dir, markerFile))
-	return err == nil && fi.Mode().IsRegular()
+func readMarker(dir string) (string, error) {
+	b, err := os.ReadFile(filepath.Join(dir, markerFile))
+	return string(b), err
 }

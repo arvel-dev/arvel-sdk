@@ -393,8 +393,8 @@ Standard ACP methods: `session/new`, `session/load`, `session/prompt`, `session/
         "subagents": { "enabled": true, "model": "claude-haiku-5-5", "effort": "low", "maxParallel": 2 },
         "budget": { "maxTurns": 200, "maxUsd": 5.0 },   // maxUsd only meaningful for api billing; may be absent
         "skills": [                          // Agent Skills folders the host prepared for this session (read-only)
-          { "name": "laravel-migrations", "path": "/…/arvel/skills/laravel-migrations", "invocation": "auto" },
-          { "name": "release-notes", "path": "/…/arvel/skills/release-notes", "invocation": "manual" }
+          { "name": "laravel-migrations", "path": "/…/arvel/skills/arvel-plugin-claude/laravel-migrations", "invocation": "auto" },
+          { "name": "release-notes", "path": "/…/arvel/skills/arvel-plugin-claude/release-notes", "invocation": "manual" }
         ],
         "resumeFrom": null                  // or a vendor session id for continuing elsewhere
       }
@@ -412,7 +412,7 @@ Plugin obligations:
 3. **Never bypass.** Plugins MUST NOT use vendor "skip all permissions" modes.
 4. **Instructions** are appended to the vendor's default system prompt (never replace it).
 5. **MCP servers** from `mcpServers` MUST be made available to the vendor CLI, and *only* those plus the vendor's built-ins (project-defined MCP servers are off unless the connection config enables them).
-5a. **Skills** from `_meta.arvel.skills` MUST be made visible to the vendor CLI in its native way. Examples: copy them into a `skills.projectDirs` folder inside `cwd`, excluded from git through the worktree's `info/exclude`; or pass an extra directory flag. The plugin MUST NOT modify the source folders, and MUST NOT overwrite a skill of the same name that the repository already has; it prefixes its copy with `arvel-` instead. `invocation: "manual"` maps to the vendor's "do not auto-invoke" switch where one exists. The plugin removes its copies when the session closes.
+5a. **Skills** from `_meta.arvel.skills` are the enabled Arvel skills selected by the host for this session's provider (§7.7) and MUST be made visible to the vendor CLI in its native way. Examples: copy them into a `skills.projectDirs` folder inside `cwd`, excluded from git through the worktree's `info/exclude`; or pass an extra directory flag. The plugin MUST NOT modify source folders or overwrite existing skills, including copies used by other active sessions; it tries an `arvel-` prefix on collision and fails safely if that name is also occupied. `invocation: "manual"` maps to the vendor's "do not auto-invoke" switch where one exists; it is not an enable/disable setting. On session close or failed setup, cleanup removes only copies owned by that session. A materialization marker alone MUST NOT be treated as proof that a copy is stale; recovery of abandoned copies requires evidence that no active task uses them. Separate session working directories or native per-session directory flags SHOULD be used when sessions need different skill selections. External/global CLI skills may remain available (§7.7).
 6. **Budget**: pass `maxTurns` / `maxUsd` to the vendor when it supports them; otherwise enforce in the plugin and stop with `budget_exceeded` (§9).
 
 Response: `{ "sessionId": "…", "configOptions": [...] }`. The plugin SHOULD return ACP config options with categories `model` and `thought_level` so generic ACP clients can switch them.
@@ -480,9 +480,15 @@ Subagents: every update produced inside a subagent carries `_meta.arvel.subagent
 
 `session/cancel` (notification) → plugin interrupts the vendor turn using the vendor's *graceful* mechanism, waits up to 10 s, then kills the vendor process tree (and will resume on next prompt). The pending `session/prompt` resolves with `stopReason: "cancelled"`.
 
-### 7.7 Skills and MCP are the host's catalogue
+### 7.7 Provider skill catalogues and the host's MCP catalogue
 
-The host owns the catalogue of skills and MCP servers, along with their scopes and the per-role assignment. Plugins only *deliver* what arrives in a session. They never install skills or MCP servers themselves, and with default connection settings they never load the user's personal skill or MCP configuration into Arvel sessions. The only exception is **read-only discovery on the user's request** (§7.9), which lets the host offer to copy existing definitions into its catalogue.
+The host maintains a separate shared skill catalogue for each provider. Every catalogue and skill entry MUST have an explicit source and owner, distinguishing Arvel-managed copies, external vendor CLI originals and integration-plugin contributions. Catalogues of different providers MUST NOT be merged automatically. Spaces and roles select skills from the catalogue of their corresponding provider. The host stores catalogue identity, provenance, ownership and selections locally; these do not require new wire fields. `_meta.arvel.skills` carries only the resolved, enabled Arvel skill references for the session's provider.
+
+Arvel skills in a space MUST support enabling, disabling and removal from that space. Disabling or removing a space selection excludes it from subsequent session metadata; it does not delete an external original, remove another space's selection, or delete materialized copies used by other active tasks. Changes for an active task MUST be applied at a safe session boundary, with that session's owned copies cleaned up before replacement (§7.1 item 5a). Shared working directories cannot isolate different per-session selections by themselves; the plugin must use isolated working directories or a native session-specific mechanism when necessary.
+
+External/global skills supplied by the vendor CLI MAY remain available to the AI. Strict exclusion of all external skills is not required. When a CLI cannot disable them, the application MUST clearly disclose that limitation and MUST NOT show a nonfunctional disable control. Disabling an Arvel-managed copy MUST NOT be presented as disabling an independently available external original. CLI-specific discovery, delivery and supported controls belong to provider plugins; the host MUST remain provider-independent. Plugins do not independently install skills into Arvel's catalogues; user-requested read-only discovery (§7.9) lets the host offer an explicit import into the corresponding provider's catalogue while preserving source and owner.
+
+The MCP policy is unchanged: the host owns the MCP catalogue, scopes and per-role assignment; plugins only deliver the selected definitions and MUST NOT independently install MCP servers or load personal MCP configuration by default. Discovery remains read-only and user-requested (§7.9); project MCP servers remain off unless enabled in connection config (§7.1 item 5). Skill availability grants no file, command or network permissions, changes no workspace sandbox boundary (§15), and does not relax credential isolation (§11.1).
 
 ### 7.8 Reserved
 
@@ -519,6 +525,7 @@ Rules:
 - **Read-only.** The plugin reads only the vendor's documented configuration and skill locations (its SPEC lists them), never credential files (§11.1).
 - **Secret values never leave the plugin.** Env vars and headers are returned by name with `{ "secret": true }` when the value is a literal or looks like a key; a reference to an env var is returned as `{ "envRef": "NAME" }`. The host asks the user to enter secrets into its own store.
 - `source` is a display string for the UI; `path` is an absolute path the host may read to copy a skill folder (inside the listed projects or the user's home only).
+- Skill discovery is attributed to the responding provider. The host retains the reported source and scope, records the original owner and the owner of any imported copy, and offers import into that provider's catalogue only; discovery neither merges provider catalogues nor grants permission to delete originals. External skill visibility in sessions does not require automatic discovery or import (§7.7).
 - Unknown fields are ignored; an empty result is valid.
 
 ## 8. Concurrency
@@ -837,7 +844,7 @@ The user's own terminal in the Code view, merges done by the host, and the host 
 ### 16.4 MCP servers and skills
 
 - `mcpServers[]`: stdio servers started from the plugin's own release binary (`{bin}` is the entry binary) or an HTTP `url`. The host adds them to its catalogue of agent tools with the scope «из плагина», shows the first-run review like any MCP server, runs them inside the workspace sandbox (§15) and lets roles opt in per tool. A plugin cannot assign its servers to roles itself.
-- `skills[]`: Agent Skills folders inside the release archive, added to the catalogue with the scope «из плагина», delivered through §7.1 `skills`.
+- `skills[]`: Agent Skills folders inside the release archive, offered to the relevant provider's skill catalogue with the scope «из плагина», the integration plugin identified as source/owner, and no automatic merging of provider catalogues (§7.7). Spaces and roles opt in; selected skills are delivered through §7.1 `skills`. Removing a space selection does not delete the integration package's original files.
 - `team` plugins MUST NOT have `entry`, `mcpServers` or `skills`; `integration` plugins MUST have at least one MCP server or skill.
 
 ### 16.5 Validation and conformance

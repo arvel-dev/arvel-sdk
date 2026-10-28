@@ -21,10 +21,10 @@ cp -R arvel-sdk/examples/echo/conformance arvel-plugin-myagent/
 cp arvel-sdk/templates/LICENSE arvel-plugin-myagent/
 cd arvel-plugin-myagent
 go mod init github.com/YOUR_ORG/arvel-plugin-myagent
-go get github.com/arvel-dev/arvel-sdk@v0.1.2
+go get github.com/arvel-dev/arvel-sdk@v0.1.3
 go mod tidy
 go build -o bin/plugin .
-go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.1.2
+go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.1.3
 arvel-plugin-check --level release --manifest arvel.json --scenarios conformance -- ./bin/plugin
 ```
 
@@ -115,7 +115,33 @@ and workspace; do not share one vendor process between workspaces.
 `protocol/skills.Materialize(cwd, dirs, refs)` returns `(cleanup func(), err error)`.
 Use the announced project skill directories and the host's refs, retain cleanup
 for session Close, and run it on failed setup too. It handles git/worktree
-excludes, name collisions and manual-invocation metadata; do not reimplement it.
+excludes, name collisions and manual-invocation metadata. Cleanup is idempotent
+and checks a unique copy owner before deletion. Existing marked copies are
+preserved: a marker does not prove that another session has ended. If both the
+requested name and its `arvel-` form are occupied, setup returns `ErrNameTaken`.
+Do not reclaim those folders automatically. Use separate session working
+directories or a verified native per-session directory mechanism when selections
+differ or names are exhausted; shared project directories expose their skills
+to every CLI session using that directory.
+
+The host keeps a separate shared catalogue for each provider, with explicit
+source and owner; spaces and roles select skills for that provider. Consume only
+the resolved enabled Arvel refs in session metadata. `manual` controls automatic
+invocation, not whether a skill is enabled. Disabling/removing an Arvel skill in
+a space affects subsequent sessions or a safe session restart, never its external
+original or copies owned by other active tasks.
+
+External/global CLI skills may remain available. Implement CLI-specific controls
+in the provider and document which ones work; the host must remain independent
+of vendor paths and flags. If exclusion is unsupported, the application must
+disclose that those skills remain available and omit a nonfunctional toggle.
+Use the existing connection config schema/status information (§5.1, §6) and plugin
+documentation to describe supported behavior; no new skills wire fields are
+needed. Skill visibility does not change file/command/network permissions,
+authentication isolation, the sandbox or the MCP policy. See
+[PROTOCOL §7.7](PROTOCOL.md#77-provider-skill-catalogues-and-the-hosts-mcp-catalogue).
+The ownership-safe cleanup described here requires SDK v0.1.3 or later; the Go
+API and `pluginApi: "1"` wire fields are unchanged.
 
 ## Manifest and logs
 

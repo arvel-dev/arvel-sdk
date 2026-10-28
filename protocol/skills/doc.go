@@ -8,7 +8,12 @@
 // the copies from git through the worktree's info/exclude, prefixes a folder
 // with "arvel-" when the repository already has a skill of that name, turns
 // invocation "manual" into disable-model-invocation: true, and returns a
-// cleanup function that removes everything again. Source folders are only read.
+// cleanup function that removes only that call's uniquely marked copies. Source
+// folders are only read. Existing marked copies are never reclaimed; if both
+// names are occupied Materialize returns ErrNameTaken. Abandoned copies need
+// separate recovery after proving that no active task uses them. Use isolated
+// session working directories when skill selections differ. Materialize does
+// not disable external/global vendor skills or manage host catalogue selections.
 //
 // Materialize starts the git binary (through procx) to find info/exclude, so a
 // plugin that calls it must list "git" in permissions.spawn of its manifest.

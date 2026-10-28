@@ -8,6 +8,18 @@ change the Go API; every such change carries a migration note. The protocol
 
 ## [Unreleased]
 
+### Changed
+- Skills use separate provider catalogues with explicit source and owner. Spaces
+  and roles select enabled Arvel skills; external/global CLI skills may remain
+  available, with unsupported exclusion disclosed and no nonfunctional toggle.
+  File, command, network, authentication, sandbox and MCP policies are unchanged.
+
+### Fixed
+- Skill materialization preserves existing marked copies and cleanup removes only
+  copies carrying that call's unique ownership marker, protecting other active
+  tasks and external originals. Occupied names now use the `arvel-` fallback or
+  return `ErrNameTaken`; abandoned copies are no longer reclaimed automatically.
+
 ## [0.1.2] - 2026-10-28
 
 ### Added

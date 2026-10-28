@@ -75,7 +75,12 @@ The protocol's integration example shows roles, types, an MCP server and skills
 together. A `team` must have none of `entry`, `connections`, MCP servers or skills;
 an integration must have at least one server or skill. Package skill folders
 inside the archive; reference them by relative path. The host adds them to its
-catalogue and delivers selected skills through session metadata.
+catalogues separately for each provider, recording the integration plugin as
+source/owner, and delivers the enabled space/role selections through session
+metadata. Catalogues are not merged automatically. Removing a skill from a space
+does not delete its packaged original or copies used by other active tasks.
+External/global CLI skills may still be available; this does not change MCP or
+permission policy. See [PROTOCOL §7.7](PROTOCOL.md#77-provider-skill-catalogues-and-the-hosts-mcp-catalogue).
 
 `{bin}` resolves to the entry executable. The checker accepts an explicit local
 build after `--`, which is useful before making platform archives:

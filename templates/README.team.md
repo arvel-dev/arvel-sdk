@@ -36,6 +36,12 @@ authentication setup separately: MCP contributions expose no env/header or
 credential-reference fields. Never put keys in manifest commands or URLs.
 List skill directories, invocation modes and permissions. Remove this section
 only for a team with no MCP servers or skills.
+Identify the integration plugin as source/owner of its skill originals. Explain
+how spaces and roles opt into the relevant provider's separate catalogue, without
+automatic merging across providers. Disabling/removing a space selection must
+preserve packaged/external originals and copies used by other active tasks.
+External/global vendor CLI skills may remain available; permissions and MCP
+policy are unchanged.
 
 ## Compatibility
 

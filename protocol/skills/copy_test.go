@@ -126,7 +126,7 @@ func TestCopyTree_WritesMarker(t *testing.T) {
 	if err := copyTree(src, dst, nil); err != nil {
 		t.Fatal(err)
 	}
-	if !hasMarker(dst) {
-		t.Fatal("marker missing")
+	if owner, err := readMarker(dst); err != nil || owner == "" {
+		t.Fatalf("marker missing: %q, %v", owner, err)
 	}
 }

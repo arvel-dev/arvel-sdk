@@ -65,12 +65,12 @@
         "skills": [
           {
             "name": "laravel-migrations",
-            "path": "/…/arvel/skills/laravel-migrations",
+            "path": "/…/arvel/skills/arvel-plugin-claude/laravel-migrations",
             "invocation": "auto"
           },
           {
             "name": "release-notes",
-            "path": "/…/arvel/skills/release-notes",
+            "path": "/…/arvel/skills/arvel-plugin-claude/release-notes",
             "invocation": "manual"
           }
         ],

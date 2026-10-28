@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -15,30 +16,54 @@ import (
 
 // result is what Materialize has done so far; undo reverses it.
 type result struct {
-	folders []string // created skill folders
+	folders []ownedFolder
+	target  string // project skills directory locked during cleanup
+	cwd     string
 	lines   []string // exclude lines this call added
 	exclude string   // path of the exclude file
 	parents []string // directories created on the way to the skills dir
 }
 
+type ownedFolder struct {
+	path        string
+	owner       string
+	excludeLine string
+}
+
 func (r *result) undo() {
+	defer func() {
+		for i := len(r.parents) - 1; i >= 0; i-- {
+			_ = os.Remove(r.parents[i]) // only succeeds when empty
+		}
+	}()
+	if r.target == "" || confined(r.cwd, r.target) != nil {
+		return
+	}
+	unlock, err := lockFile(filepath.Join(r.target, ".arvel-lock"))
+	if err != nil {
+		return // preserve copies when ownership cannot be checked safely
+	}
+	var removedLines []string
 	for _, f := range r.folders {
-		if hasMarker(f) { // never delete a folder we did not create
-			_ = os.RemoveAll(f)
+		if owner, err := readMarker(f.path); err == nil && owner == f.owner {
+			if err := os.RemoveAll(f.path); err == nil && slices.Contains(r.lines, f.excludeLine) {
+				removedLines = append(removedLines, f.excludeLine)
+			}
 		}
 	}
 	if r.exclude != "" {
-		_ = removeLines(r.exclude, r.lines)
+		_ = removeLines(r.exclude, removedLines)
 	}
-	for i := len(r.parents) - 1; i >= 0; i-- {
-		_ = os.Remove(r.parents[i]) // only succeeds when empty
-	}
+	unlock()
 }
 
 // Materialize copies the skill folders of refs into the first directory of dirs
 // (relative to cwd), excludes the copies from git, and returns a function that
 // removes them again. The returned function is never nil and is safe to call
 // more than once; on error everything done so far has been rolled back.
+// Existing copies, including marked copies, are never reclaimed automatically.
+// If both the requested name and its arvel- form are occupied, ErrNameTaken is
+// returned; use a separate session working directory to isolate more sessions.
 func Materialize(cwd string, dirs []string, refs []protocol.SkillRef) (cleanup func(), err error) {
 	noop := func() {}
 	if len(refs) == 0 {
@@ -86,6 +111,7 @@ func Materialize(cwd string, dirs []string, refs []protocol.SkillRef) (cleanup f
 		}
 	}
 	defer unlock()
+	res.target, res.cwd = target, cwd
 
 	var lines []string
 	for _, ref := range refs {
@@ -105,8 +131,13 @@ func Materialize(cwd string, dirs []string, refs []protocol.SkillRef) (cleanup f
 		if err != nil {
 			return noop, err
 		}
-		res.folders = append(res.folders, dst)
-		lines = append(lines, "/"+filepath.ToSlash(prefix)+filepath.ToSlash(dir)+"/"+final+"/")
+		owner, err := readMarker(dst)
+		if err != nil {
+			return noop, fmt.Errorf("skills: read copy owner: %w", err)
+		}
+		line := "/" + filepath.ToSlash(prefix) + filepath.ToSlash(dir) + "/" + final + "/"
+		res.folders = append(res.folders, ownedFolder{path: dst, owner: owner, excludeLine: line})
+		lines = append(lines, line)
 	}
 	if haveGit {
 		added, err := addLines(exclude, lines)
@@ -178,8 +209,8 @@ func mkdirAll(cwd, dir string, res *result) error {
 	return nil
 }
 
-// chooseName picks the folder name for a skill: its own name when free (a stale
-// copy of ours is replaced), otherwise the "arvel-" form.
+// chooseName picks a free folder name, otherwise the "arvel-" form. A marker
+// cannot distinguish a crashed session from another active session.
 func chooseName(target, name string) (string, error) {
 	for _, candidate := range []string{name, "arvel-" + name} {
 		p := filepath.Join(target, candidate)
@@ -187,12 +218,6 @@ func chooseName(target, name string) (string, error) {
 			return candidate, nil
 		} else if err != nil {
 			return "", fmt.Errorf("skills: %w", err)
-		}
-		if hasMarker(p) { // stale copy of a crashed session
-			if err := os.RemoveAll(p); err != nil {
-				return "", fmt.Errorf("skills: %w", err)
-			}
-			return candidate, nil
 		}
 	}
 	return "", fmt.Errorf("%q: %w", name, ErrNameTaken)

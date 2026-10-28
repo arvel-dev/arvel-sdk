@@ -195,7 +195,7 @@ func TestMaterialize_CleanupRemovesEverything(t *testing.T) {
 	}
 }
 
-func TestMaterialize_StaleCopyIsReplaced(t *testing.T) {
+func TestMaterialize_MarkedCopyIsPreserved(t *testing.T) {
 	repo := initRepo(t)
 	rs := refs(t, "pest-tests")
 	stale := filepath.Join(repo, ".vendor/skills/pest-tests")
@@ -206,8 +206,71 @@ func TestMaterialize_StaleCopyIsReplaced(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cleanup()
-	if b, _ := os.ReadFile(filepath.Join(stale, "SKILL.md")); strings.Contains(string(b), "old") {
-		t.Fatalf("stale copy kept: %q", b)
+	cleanup()
+	if b, _ := os.ReadFile(filepath.Join(stale, "SKILL.md")); string(b) != "old" {
+		t.Fatalf("existing marked copy changed: %q", b)
+	}
+}
+
+func TestMaterialize_OverlappingSessionsKeepTheirCopies(t *testing.T) {
+	repo := initRepo(t)
+	rs := refs(t, "shared")
+	first, err := Materialize(repo, skillDirs, rs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first()
+	second, err := Materialize(repo, skillDirs, rs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second()
+	third, err := Materialize(repo, skillDirs, append(refs(t, "unused"), rs...))
+	third()
+	if !errors.Is(err, ErrNameTaken) {
+		t.Fatalf("third session: %v, want ErrNameTaken", err)
+	}
+	if exists(filepath.Join(repo, ".vendor/skills/unused")) {
+		t.Fatal("failed setup left its partial copy")
+	}
+	if !exists(filepath.Join(repo, ".vendor/skills/shared/SKILL.md")) {
+		t.Fatal("failed setup removed the first active session's copy")
+	}
+	first()
+	if !exists(filepath.Join(repo, ".vendor/skills/arvel-shared/SKILL.md")) {
+		t.Fatal("cleanup removed another active session's copy")
+	}
+	if !exists(filepath.Join(rs[0].Path, "SKILL.md")) {
+		t.Fatal("cleanup removed the source")
+	}
+	b, err := os.ReadFile(excludeFile(t, repo))
+	if err != nil || !strings.Contains(string(b), "/.vendor/skills/arvel-shared/") {
+		t.Fatalf("active session's exclude lost: %q, %v", b, err)
+	}
+}
+
+func TestMaterialize_CleanupPreservesReplacement(t *testing.T) {
+	repo := initRepo(t)
+	rs := refs(t, "shared")
+	cleanup, err := Materialize(repo, skillDirs, rs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	dst := filepath.Join(repo, ".vendor/skills/shared")
+	if err := os.Rename(dst, dst+"-saved"); err != nil {
+		t.Fatal(err)
+	}
+	if err := copyTree(rs[0].Path, dst, nil); err != nil {
+		t.Fatal(err)
+	}
+	cleanup()
+	if !exists(filepath.Join(dst, "SKILL.md")) {
+		t.Fatal("old cleanup removed a replacement copy")
+	}
+	b, err := os.ReadFile(excludeFile(t, repo))
+	if err != nil || !strings.Contains(string(b), "/.vendor/skills/shared/") {
+		t.Fatalf("replacement's exclude lost: %q, %v", b, err)
 	}
 }
 
