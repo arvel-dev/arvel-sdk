@@ -1,0 +1,65 @@
+{
+  "id": "strictprovider",
+  "name": "Strict synthetic provider",
+  "type": "provider",
+  "version": "0.0.0",
+  "pluginApi": "1",
+  "license": "Apache-2.0",
+  "entry": {
+    "darwin-arm64": {
+      "asset": "strict_darwin_arm64.tar.gz",
+      "bin": "strictprovider"
+    },
+    "darwin-amd64": {
+      "asset": "strict_darwin_amd64.tar.gz",
+      "bin": "strictprovider"
+    },
+    "linux-arm64": {
+      "asset": "strict_linux_arm64.tar.gz",
+      "bin": "strictprovider"
+    },
+    "linux-amd64": {
+      "asset": "strict_linux_amd64.tar.gz",
+      "bin": "strictprovider"
+    },
+    "windows-arm64": {
+      "asset": "strict_windows_arm64.zip",
+      "bin": "strictprovider.exe"
+    },
+    "windows-amd64": {
+      "asset": "strict_windows_amd64.zip",
+      "bin": "strictprovider.exe"
+    }
+  },
+  "permissions": {},
+  "checksums": "checksums.txt",
+  "connections": [
+    {
+      "kind": "synthetic",
+      "label": "Synthetic",
+      "billing": "unknown",
+      "config": {
+        "type": "object",
+        "properties": {
+          "executable": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "secrets": [
+        {
+          "id": "token",
+          "label": "Synthetic token",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

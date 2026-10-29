@@ -8,11 +8,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
-	"github.com/arvel-dev/arvel-sdk/protocol"
-	"github.com/arvel-dev/arvel-sdk/testkit/fakevendor"
 	"github.com/arvel-dev/arvel-sdk/testkit/mockhost"
 	"github.com/arvel-dev/arvel-sdk/testkit/scenario"
 )
@@ -26,21 +23,21 @@ func checkProxyEnv(reported map[string]string, proxy string) []string {
 	var out []string
 	for _, name := range []string{"HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY"} {
 		if got := reported[name]; got != proxy {
-			out = append(out, fmt.Sprintf("%s=%q, want %q", name, got, proxy))
+			out = append(out, fmt.Sprintf("%s: proxy mismatch", name))
 		}
 	}
 	if got := reported["NO_PROXY"]; got != noProxyValue {
-		out = append(out, fmt.Sprintf("NO_PROXY=%q, want %q", got, noProxyValue))
+		out = append(out, "NO_PROXY: localhost exclusions mismatch")
 	}
 	if got, ok := reported["SSH_AUTH_SOCK"]; ok && got != "" {
-		out = append(out, fmt.Sprintf("SSH_AUTH_SOCK=%q, want absent", got))
+		out = append(out, "SSH_AUTH_SOCK: must be absent")
 	}
 	return out
 }
 
 // runProxyCheck runs the release-level proxy test when a proxy scenario is
 // present, and skips it otherwise (PROTOCOL §15).
-func runProxyCheck(ctx context.Context, f *flags, dir string) CheckResult {
+func runProxyCheck(ctx context.Context, f *flags, dir string) (result CheckResult) {
 	_, sc, err := findProxyScenario(dir)
 	if err != nil {
 		return fail("proxy", err.Error())
@@ -49,33 +46,23 @@ func runProxyCheck(ctx context.Context, f *flags, dir string) CheckResult {
 		return skip("proxy", "no proxy scenario")
 	}
 
-	tmp, err := os.MkdirTemp("", "arvel-proxy-")
-	if err != nil {
-		return fail("proxy", err.Error())
-	}
-	defer os.RemoveAll(tmp)
-
-	fakevendorDir := resolveFakevendorDir(dir)
-	env, cleanup, err := resolveProxyEnv(sc, fakevendorDir, tmp)
-	if err != nil {
-		return fail("proxy", err.Error())
-	}
-	defer cleanup()
-
 	proxy := randomProxyURL()
-	d, err := startDriverWithEnv(f, append(os.Environ(), env...))
+	r, err := prepareCheck(ctx, f, "proxy", sc, resolveFakevendorDir(dir), proxy)
 	if err != nil {
-		return fail("proxy", "start: "+err.Error())
+		return fail("proxy", safeError(err))
 	}
-	defer d.Close()
+	defer r.finishOne(&result)
+	var res mockhost.ScenarioResult
+	_, runErr := r.initialize()
+	if runErr == nil {
+		runErr = r.ready()
+	}
+	if runErr == nil {
+		res, runErr = r.prepared.RunInitialized(ctx, r.d)
+	}
 
-	res, runErr := d.RunScenario(sc, mockhost.ScenarioOptions{
-		Tmpdir:        tmp,
-		FakevendorDir: fakevendorDir,
-		Sandbox:       &protocol.SandboxInfo{Mode: protocol.SandboxModeOS, Proxy: proxy},
-	})
 	if runErr != nil {
-		return fail("proxy", runErr.Error())
+		return fail("proxy", safeError(runErr))
 	}
 	if !res.Pass {
 		return fail("proxy", firstScenarioFailure(res))
@@ -115,43 +102,6 @@ func findProxyScenario(dir string) (string, *scenario.Scenario, error) {
 	return "", nil, nil
 }
 
-// resolveProxyEnv resolves the scenario's plugin.env placeholders into
-// NAME=VALUE strings and returns a cleanup that removes any built fakevendor
-// binaries.
-func resolveProxyEnv(sc *scenario.Scenario, fakevendorDir, tmpdir string) ([]string, func(), error) {
-	var cleanups []func()
-	resolver := scenario.Resolver{
-		Tmpdir: tmpdir,
-		Fakevendor: func(name string) (string, error) {
-			script := filepath.Join(fakevendorDir, name+".yaml")
-			s, err := fakevendor.LoadFile(script)
-			if err != nil {
-				return "", err
-			}
-			bin, cleanup, err := fakevendor.Build(context.Background(), s, "fakevendor-"+name)
-			if err != nil {
-				return "", err
-			}
-			cleanups = append(cleanups, cleanup)
-			return bin, nil
-		},
-	}
-	env := make([]string, 0, len(sc.Plugin.Env))
-	for k, v := range sc.Plugin.Env {
-		rv, err := resolver.ResolveString(v)
-		if err != nil {
-			return nil, nil, fmt.Errorf("proxy: plugin.env %s: %w", k, err)
-		}
-		env = append(env, k+"="+rv)
-	}
-	sort.Strings(env)
-	return env, func() {
-		for _, c := range cleanups {
-			c()
-		}
-	}, nil
-}
-
 // collectEnv scans every collected session update for agent_message_chunk text
 // of the form NAME=VALUE and returns the reported environment.
 func collectEnv(updates map[string][]map[string]any) map[string]string {
@@ -169,7 +119,11 @@ func collectEnv(updates map[string][]map[string]any) map[string]string {
 			for _, line := range strings.Split(text, "\n") {
 				k, v, ok := strings.Cut(line, "=")
 				if ok && k != "" {
-					reported[k] = v
+					if previous, exists := reported[k]; exists && previous != v {
+						reported[k] = "conflicting reports"
+					} else {
+						reported[k] = v
+					}
 				}
 			}
 		}

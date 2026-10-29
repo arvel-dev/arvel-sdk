@@ -18,6 +18,7 @@ type Scenario struct {
 	Name       string     `yaml:"name"`
 	Plugin     Plugin     `yaml:"plugin"`
 	Initialize Initialize `yaml:"initialize"`
+	Workspace  string     `yaml:"workspace"`
 	Steps      []Step     `yaml:"steps"`
 }
 
@@ -29,7 +30,9 @@ type Plugin struct {
 
 // Initialize holds the connection sent in _meta.arvel of initialize.
 type Initialize struct {
-	Connection protocol.ConnectionInfo `yaml:"connection"`
+	Connection  protocol.ConnectionInfo `yaml:"connection"`
+	DataDir     string                  `yaml:"dataDir"`
+	kindPresent bool
 }
 
 // Step is one call in a scenario.
@@ -79,7 +82,11 @@ func Load(r io.Reader) (*Scenario, error) {
 	dec.KnownFields(true)
 	var s Scenario
 	if err := dec.Decode(&s); err != nil {
-		return nil, fmt.Errorf("scenario: load: %w", err)
+		return nil, errors.New("scenario: invalid YAML or field type")
+	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		return nil, errors.New("scenario: expected one YAML document")
 	}
 	if err := s.Validate(); err != nil {
 		return nil, err
@@ -115,8 +122,82 @@ func (s *Scenario) Validate() error {
 			errs = append(errs, fmt.Errorf("scenario: steps[%d].call is empty", i))
 		}
 		if st.AnswerPermissions != "" && !validAnswerPermissions[st.AnswerPermissions] {
-			errs = append(errs, fmt.Errorf("scenario: steps[%d].answerPermissions %q is not allow_once, allow_always or reject_once", i, st.AnswerPermissions))
+			errs = append(errs, fmt.Errorf("scenario: steps[%d].answerPermissions must be allow_once, allow_always or reject_once", i))
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// KindSpecified distinguishes an omitted kind from an explicitly empty YAML kind.
+func (in Initialize) KindSpecified() bool { return in.kindPresent || in.Connection.Kind != "" }
+
+// UnmarshalYAML preserves field presence without changing production wire types.
+func (in *Initialize) UnmarshalYAML(n *yaml.Node) error {
+	type plain Initialize
+	if err := validateInitializeNode(n, false, 0); err != nil {
+		return err
+	}
+	var value plain
+	if err := n.Decode(&value); err != nil {
+		return errors.New("scenario: invalid initialize field type")
+	}
+	// Decode the effective shallow YAML mapping to preserve native merge priority:
+	// a direct connection replaces a merged connection, including kind presence.
+	var fields struct {
+		Connection map[string]any `yaml:"connection"`
+	}
+	if err := n.Decode(&fields); err != nil {
+		return errors.New("scenario: invalid connection mapping")
+	}
+	_, value.kindPresent = fields.Connection["kind"]
+	*in = Initialize(value)
+	return nil
+}
+
+func validateInitializeNode(n *yaml.Node, connection bool, depth int) error {
+	if n == nil || depth > 64 {
+		return errors.New("scenario: invalid initialize alias")
+	}
+	if n.Tag == "!!null" {
+		return nil
+	}
+	if n.Kind == yaml.AliasNode {
+		return validateInitializeNode(n.Alias, connection, depth+1)
+	}
+	if n.Kind != yaml.MappingNode {
+		return errors.New("scenario: initialize and connection must be mappings")
+	}
+	for i := 0; i < len(n.Content); i += 2 {
+		key, value := n.Content[i].Value, n.Content[i+1]
+		if key == "<<" {
+			nodes := []*yaml.Node{value}
+			if value.Kind == yaml.SequenceNode {
+				nodes = value.Content
+			}
+			for _, merged := range nodes {
+				if err := validateInitializeNode(merged, connection, depth+1); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if connection {
+			switch key {
+			case "id", "kind", "config", "secrets":
+			default:
+				return errors.New("scenario: unknown connection field")
+			}
+			continue
+		}
+		switch key {
+		case "dataDir":
+		case "connection":
+			if err := validateInitializeNode(value, true, depth+1); err != nil {
+				return err
+			}
+		default:
+			return errors.New("scenario: unknown initialize field")
+		}
+	}
+	return nil
 }

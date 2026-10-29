@@ -109,6 +109,11 @@ arvel-plugin-check --manifest ./examples/team-sample/arvel.json --package ./exam
 
 The last command runs from an SDK checkout. Add `--json` for a structured report.
 
+Use `--test-env conformance-env.yaml` for explicit synthetic connection inputs,
+isolated startup environment and deterministic release probes. See
+[test environment configuration](docs/CONFORMANCE-ENVIRONMENT.md) for precedence,
+scenario overrides, placeholders and directory ownership.
+
 | Mode | Checks |
 |---|---|
 | Provider `basic` | Manifest, initialize under 5 s, status/models shapes, unknown methods, clean shutdown, valid stderr JSON and canary-secret leakage across raw stdout/stderr. |

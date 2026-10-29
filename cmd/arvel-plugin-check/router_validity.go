@@ -24,15 +24,16 @@ var (
 
 // checkRouteValidity starts a fresh driver, initializes it and runs the
 // randomized id/slot/confidence validity check (PROTOCOL §14.9).
-func checkRouteValidity(ctx context.Context, f *flags) CheckResult {
-	d, err := startDriver(f)
+func checkRouteValidity(ctx context.Context, f *flags) (result CheckResult) {
+	r, err := prepareCheck(ctx, f, "route-validity", nil, resolveFakevendorDir(f.scenarios), "")
 	if err != nil {
 		return fail("route validity", "start: "+err.Error())
 	}
-	defer d.Close()
-	init, err := d.Initialize(releaseInitMeta())
+	defer r.finishOne(&result)
+	d := r.d
+	init, err := r.initialize()
 	if err != nil {
-		return fail("route validity", "initialize: "+err.Error())
+		return fail("route validity", "initialize: "+safeError(err))
 	}
 	rng := rand.New(rand.NewSource(1)) // seeded for reproducibility
 	return checkRouteValidityRequests(ctx, d, rng, init.Features)

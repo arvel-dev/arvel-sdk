@@ -48,6 +48,13 @@ func TestCheckProxyEnv(t *testing.T) {
 	}
 }
 
+func TestCollectEnv_ConflictingReportsCannotPass(t *testing.T) {
+	updates := map[string][]map[string]any{"one": {{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"text": "HTTPS_PROXY=http://correct"}}}, "two": {{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"text": "HTTPS_PROXY=http://wrong"}}}}
+	if got := collectEnv(updates); len(checkProxyEnv(got, "http://correct")) == 0 || got["HTTPS_PROXY"] == "http://correct" {
+		t.Fatal("conflicting proxy report could pass")
+	}
+}
+
 func TestRunProxyCheck_EchoSkips(t *testing.T) {
 	if testing.Short() {
 		t.Skip("go build of the example binary")

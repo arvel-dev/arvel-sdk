@@ -5,11 +5,15 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/arvel-dev/arvel-sdk/manifest"
 	"io"
 )
 
 // flags are the parsed command-line options of arvel-plugin-check.
 type flags struct {
+	testEnv   string
+	config    *testConfiguration
+	loaded    *manifest.Manifest
 	level     string   // basic or release
 	scenarios string   // directory of scenario files (release level)
 	manifest  string   // path to arvel.json
@@ -26,6 +30,7 @@ func parseFlags(args []string, stderr io.Writer) (*flags, error) {
 	f := &flags{}
 	fs := flag.NewFlagSet("arvel-plugin-check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+	fs.StringVar(&f.testEnv, "test-env", "", "test environment YAML (synthetic inputs only)")
 	fs.StringVar(&f.level, "level", "basic", "conformance level: basic or release")
 	fs.StringVar(&f.scenarios, "scenarios", "./conformance", "directory of scenario files (release level)")
 	fs.StringVar(&f.manifest, "manifest", "arvel.json", "path to arvel.json")

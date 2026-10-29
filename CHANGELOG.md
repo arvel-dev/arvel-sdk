@@ -8,6 +8,23 @@ change the Go API; every such change carries a migration note. The protocol
 
 ## [Unreleased]
 
+### Added
+- Explicit conformance test environments with `--test-env`: synthetic connection
+  inputs, scenario overrides, isolated directories and deterministic session probes.
+- Testkit environments and scenario preparation APIs for resolving initialization
+  and startup environment before launching a plugin, with reported teardown errors.
+
+### Fixed
+- Provider and router checks share declared-connection initialization and portable
+  private directories across basic, release, scenario and proxy runs. Missing test
+  inputs fail configuration instead of relying on an implicit local connection.
+- Scenario startup applies `plugin.env` and resolves initialization/config/secrets
+  placeholders while preserving value types. Processes stop before test resources
+  are removed; caller-owned directories are preserved.
+- Conformance diagnostics omit sensitive payloads and check canary leakage on
+  failed runs. Proxy overrides cannot supply the expected forwarding result, and
+  configured cancellation/busy probes fail when no active turn was exercised.
+
 ## [0.1.3] - 2026-10-29
 
 ### Changed

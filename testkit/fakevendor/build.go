@@ -3,7 +3,10 @@
 package fakevendor
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,12 +15,21 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/arvel-dev/arvel-sdk/procx"
+	"golang.org/x/mod/modfile"
 	"gopkg.in/yaml.v3"
 )
 
 // Build compiles a temporary self-contained executable named name that replays
 // s, using `go build`. It returns the absolute path and a cleanup func.
 func Build(ctx context.Context, s *Script, name string) (string, func(), error) {
+	if err := ctx.Err(); err != nil {
+		return "", nil, err
+	}
+	sdkDir, err := resolveModuleDir(ctx, moduleRoot())
+	if err != nil {
+		return "", nil, err
+	}
 	dir, err := os.MkdirTemp("", "fakevendor-*")
 	if err != nil {
 		return "", nil, err
@@ -58,7 +70,7 @@ func Build(ctx context.Context, s *Script, name string) (string, func(), error) 
 
 	gomod := "module fakevendor.local\n\ngo 1.27.2\n\n" +
 		"require github.com/arvel-dev/arvel-sdk v0.0.0\n\n" +
-		"replace github.com/arvel-dev/arvel-sdk => " + moduleRoot() + "\n"
+		"replace github.com/arvel-dev/arvel-sdk => " + strconv.Quote(filepath.ToSlash(sdkDir)) + "\n"
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(gomod), 0o644); err != nil {
 		return fail(err)
 	}
@@ -67,11 +79,14 @@ func Build(ctx context.Context, s *Script, name string) (string, func(), error) 
 		name += ".exe"
 	}
 	out := filepath.Join(dir, name)
-	cmd := exec.CommandContext(ctx, "go", "build", "-mod=mod", "-o", out, ".")
-	cmd.Dir = dir
-	if b, err := cmd.CombinedOutput(); err != nil {
-		return fail(fmt.Errorf("fakevendor: go build: %w\n%s", err, b))
+	code, err := goCommand(ctx, dir, []string{"build", "-mod=mod", "-o", out, "."}, nil)
+	if err != nil {
+		return fail(err)
 	}
+	if code != 0 {
+		return fail(fmt.Errorf("fakevendor: go build failed (exit %d)", code))
+	}
+
 	return out, cleanup, nil
 }
 
@@ -100,4 +115,51 @@ func moduleRoot() string {
 		}
 	})
 	return moduleRootPath
+}
+
+// A published/trimmed binary may not retain a usable compilation-source path.
+// Honor the consumer module's selected SDK (including an explicit local replace).
+func resolveModuleDir(ctx context.Context, compiledRoot string) (string, error) {
+	if data, err := os.ReadFile(filepath.Join(compiledRoot, "go.mod")); err == nil && modfile.ModulePath(data) == "github.com/arvel-dev/arvel-sdk" {
+		return filepath.Abs(compiledRoot)
+	}
+	var out bytes.Buffer
+	code, err := goCommand(ctx, "", []string{"list", "-m", "-json", "github.com/arvel-dev/arvel-sdk"}, &out)
+	if err != nil {
+		return "", err
+	}
+	var module struct{ Dir string }
+	if code != 0 || json.Unmarshal(out.Bytes(), &module) != nil || !filepath.IsAbs(module.Dir) {
+		return "", errors.New("fakevendor: SDK sources unavailable; run from a Go module selecting arvel-sdk")
+	}
+	return module.Dir, nil
+}
+
+// procx owns and joins the compiler tree, including on cancellation. Never
+// reprint compiler stderr: it can contain source/configuration values.
+func goCommand(ctx context.Context, dir string, args []string, out *bytes.Buffer) (int, error) {
+	path, err := exec.LookPath("go")
+	if err != nil {
+		return -1, errors.New("fakevendor: Go toolchain is unavailable")
+	}
+	path, err = filepath.Abs(path)
+	if err != nil {
+		return -1, errors.New("fakevendor: Go executable path is invalid")
+	}
+	spec := procx.Spec{Path: path, Args: args, Dir: dir, Env: os.Environ()}
+	if out != nil {
+		spec.Stdout = out
+	}
+	p, err := procx.Start(ctx, spec)
+	if err != nil {
+		return -1, errors.New("fakevendor: Go toolchain could not start")
+	}
+	code, err := p.Wait()
+	if ctx.Err() != nil {
+		return -1, ctx.Err()
+	}
+	if err != nil {
+		return -1, errors.New("fakevendor: Go process teardown failed")
+	}
+	return code, nil
 }

@@ -115,7 +115,7 @@ func MatchUpdates(updates []map[string]any, expects []UpdateExpect) error {
 			break
 		}
 		if !found {
-			return fmt.Errorf("scenario: expected an update with sessionUpdate %q (subset %v), got %d updates", e.SessionUpdate, e.Subset, len(updates))
+			return fmt.Errorf("scenario: expected update not found among %d updates", len(updates))
 		}
 	}
 	return nil

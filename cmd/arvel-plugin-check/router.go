@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/arvel-dev/arvel-sdk/manifest"
 	"github.com/arvel-dev/arvel-sdk/protocol"
@@ -38,22 +37,16 @@ func runRouter(ctx context.Context, f *flags, m *manifest.Manifest) *Report {
 // routerBasic runs the §14.9 basic checks for a router: manifest, initialize
 // result shape (empty agentCapabilities, router-only features), session/new →
 // -32601, status, shutdown, stderr JSON lines and canary leak.
-func routerBasic(ctx context.Context, f *flags, m *manifest.Manifest) []CheckResult {
-	canary := newCanary()
-	dataDir, err := os.MkdirTemp("", "arvel-check-")
+func routerBasic(ctx context.Context, f *flags, m *manifest.Manifest) (out []CheckResult) {
+	local := *f
+	local.loaded = m
+	r, err := prepareCheck(ctx, &local, "basic", nil, resolveFakevendorDir(f.scenarios), "")
 	if err != nil {
-		return aborted("data dir", err, nil)
+		return aborted("test environment", err, nil)
 	}
-	defer os.RemoveAll(dataDir)
+	defer r.finish(&out)
+	d, meta, canary := r.d, r.meta, r.canary
 
-	d, err := startDriver(f)
-	if err != nil {
-		return aborted("start", err, []string{"initialize", "status", "session/new", "shutdown", "stderr JSON lines", "canary leak"})
-	}
-	defer d.Close()
-
-	var out []CheckResult
-	meta := buildInitMeta(m, dataDir, canary)
 	initRes, inited := checkRouterInitialize(ctx, d, meta)
 	out = append(out, initRes)
 	if inited {
@@ -67,7 +60,7 @@ func routerBasic(ctx context.Context, f *flags, m *manifest.Manifest) []CheckRes
 	code, err := d.ShutdownExit(shutdownTimeout)
 	switch {
 	case err != nil:
-		out = append(out, fail("shutdown", err.Error()))
+		out = append(out, fail("shutdown", safeError(err)))
 	case code != 0:
 		out = append(out, fail("shutdown", fmt.Sprintf("exit code %d, want 0", code)))
 	default:
@@ -112,7 +105,7 @@ func checkRouterInitialize(ctx context.Context, d *mockhost.Driver, meta protoco
 		"_meta":           protocol.WithMeta(nil, meta),
 	}
 	if err := d.Call(ctx, protocol.MethodInitialize, params, &raw); err != nil {
-		return fail("initialize", err.Error()), false
+		return fail("initialize", safeError(err)), false
 	}
 
 	if raw.Meta.Arvel.PluginAPI != protocol.PluginAPI {
