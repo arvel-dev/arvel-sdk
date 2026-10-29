@@ -21,7 +21,7 @@ mkdir -p arvel-plugin-myteam/scripts arvel-plugin-myteam/.github/workflows
 cp arvel-sdk/templates/scripts/release-notes.sh arvel-plugin-myteam/scripts/
 cp arvel-sdk/templates/.github/workflows/release.team.yml arvel-plugin-myteam/.github/workflows/release.yml
 cd arvel-plugin-myteam
-go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.1.2
+go install github.com/arvel-dev/arvel-sdk/cmd/arvel-plugin-check@v0.2.0
 arvel-plugin-check --manifest arvel.json --package .
 ```
 

@@ -8,6 +8,8 @@ change the Go API; every such change carries a migration note. The protocol
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-29
+
 ### Added
 - Explicit conformance test environments with `--test-env`: synthetic connection
   inputs, scenario overrides, isolated directories and deterministic session probes.
@@ -24,6 +26,8 @@ change the Go API; every such change carries a migration note. The protocol
 - Conformance diagnostics omit sensitive payloads and check canary leakage on
   failed runs. Proxy overrides cannot supply the expected forwarding result, and
   configured cancellation/busy probes fail when no active turn was exercised.
+- Archived and trimmed checker binaries can build fake dependencies using the
+  consumer module’s SDK sources; compiler processes stop before cancellation cleanup.
 
 ## [0.1.3] - 2026-10-29
 
