@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/arvel-dev/arvel-sdk/protocol"
-	"github.com/arvel-dev/arvel-sdk/testkit/fakevendor"
 	"github.com/arvel-dev/arvel-sdk/testkit/scenario"
 )
 
@@ -43,39 +42,20 @@ func (h *Host) RunScenario(t testing.TB, file string) {
 // transport-level failures (bad params, a plugin that died mid-scenario); a
 // mismatching expectation is a failing step, not an error.
 func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (ScenarioResult, error) {
-	res := ScenarioResult{Name: sc.Name, Pass: true}
-	fv := map[string]string{} // name -> built fakevendor binary path
-	var cleanups []func()
-	defer func() {
-		for _, f := range cleanups {
-			f()
-		}
-	}()
-	resolver := scenario.Resolver{
-		Vars:   map[string]string{},
-		Tmpdir: opts.Tmpdir,
-		Fakevendor: func(name string) (string, error) {
-			if p, ok := fv[name]; ok {
-				return p, nil
-			}
-			script := filepath.Join(opts.FakevendorDir, name+".yaml")
-			s, err := fakevendor.LoadFile(script)
-			if err != nil {
-				return "", err
-			}
-			bin, cleanup, err := fakevendor.Build(context.Background(), s, "fakevendor-"+name)
-			if err != nil {
-				return "", err
-			}
-			cleanups = append(cleanups, cleanup)
-			fv[name] = bin
-			return bin, nil
-		},
-	}
 
-	if _, err := c.Initialize(protocol.InitMeta{Connection: sc.Initialize.Connection, Sandbox: opts.Sandbox}); err != nil {
-		return res, fmt.Errorf("mockhost: initialize: %w", err)
+	p, err := PrepareScenario(context.Background(), sc, PrepareOptions{Environment: c.environment, Tmpdir: opts.Tmpdir, FakevendorDir: opts.FakevendorDir, Sandbox: opts.Sandbox})
+	if err != nil {
+		return ScenarioResult{}, err
 	}
+	c.cleanups = append(c.cleanups, p.Close)
+	if _, err := c.Initialize(p.Initialize()); err != nil {
+		return ScenarioResult{}, safeCallError("initialize", err)
+	}
+	return c.runSteps(context.Background(), sc, p.resolver)
+}
+
+func (c *core) runSteps(ctx context.Context, sc *scenario.Scenario, resolver scenario.Resolver) (ScenarioResult, error) {
+	res := ScenarioResult{Name: sc.Name, Pass: true}
 
 	var sessionID string
 	for i, step := range sc.Steps {
@@ -92,7 +72,9 @@ func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (Scenari
 		}
 
 		var result any
-		callErr := c.call(step.Call, params, &result)
+		callCtx, cancel := context.WithTimeout(ctx, c.timeout)
+		callErr := c.Call(callCtx, step.Call, params, &result)
+		cancel()
 		c.disarmPermission()
 
 		if step.ExpectError != nil {
@@ -100,7 +82,7 @@ func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (Scenari
 			switch {
 			case !errors.As(callErr, &re):
 				sr.Pass = false
-				sr.Err = fmt.Sprintf("expected error, got result %v", result)
+				sr.Err = "expected RPC error was not returned"
 			case re.Code != step.ExpectError.Code:
 				sr.Pass = false
 				sr.Err = fmt.Sprintf("error code %d, want %d", re.Code, step.ExpectError.Code)
@@ -108,7 +90,7 @@ func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (Scenari
 				d, ok := re.Arvel()
 				if !ok || string(d.Code) != step.ExpectError.Arvel {
 					sr.Pass = false
-					sr.Err = fmt.Sprintf("arvel code %q, want %q", d.Code, step.ExpectError.Arvel)
+					sr.Err = "arvel error code mismatch"
 				}
 			}
 			res.Steps = append(res.Steps, sr)
@@ -117,7 +99,7 @@ func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (Scenari
 		}
 		if callErr != nil {
 			sr.Pass = false
-			sr.Err = callErr.Error()
+			sr.Err = safeCallError(step.Call, callErr).Error()
 			res.Steps = append(res.Steps, sr)
 			res.Pass = false
 			continue
@@ -127,7 +109,7 @@ func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (Scenari
 			got, ok := result.(map[string]any)
 			if !ok || !scenario.Subset(step.Expect, got) {
 				sr.Pass = false
-				sr.Err = fmt.Sprintf("result %v does not contain %v", result, step.Expect)
+				sr.Err = "result does not contain expected fields"
 			}
 		}
 		if sr.Pass {
@@ -135,7 +117,7 @@ func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (Scenari
 				v, ok := scenario.JSONPath(result, path)
 				if !ok {
 					sr.Pass = false
-					sr.Err = fmt.Sprintf("JSONPath %q not found in %v", path, result)
+					sr.Err = "saved result path was not found"
 					break
 				}
 				resolver.Vars[name] = fmt.Sprint(v)
@@ -158,3 +140,20 @@ func (c *core) runScenario(sc *scenario.Scenario, opts ScenarioOptions) (Scenari
 	res.Updates = c.snapshotUpdates()
 	return res, nil
 }
+
+// safeCallError preserves error identity while omitting untrusted RPC payloads.
+func safeCallError(method string, err error) error {
+	var re *protocol.RPCError
+	if errors.As(err, &re) {
+		return &callError{message: fmt.Sprintf("mockhost: %s: RPC code %d", method, re.Code), cause: err}
+	}
+	return &callError{message: "mockhost: " + method + ": transport or deadline failure", cause: err}
+}
+
+type callError struct {
+	message string
+	cause   error
+}
+
+func (e *callError) Error() string { return e.message }
+func (e *callError) Unwrap() error { return e.cause }

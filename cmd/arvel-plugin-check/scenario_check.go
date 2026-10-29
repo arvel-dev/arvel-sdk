@@ -64,28 +64,24 @@ func resolveFakevendorDir(dir string) string {
 
 // runOneScenario runs a single scenario file in a fresh driver and returns its
 // per-step rows followed by the aggregate scenario row.
-func runOneScenario(ctx context.Context, f *flags, file, fakevendorDir string) []CheckResult {
+func runOneScenario(ctx context.Context, f *flags, file, fakevendorDir string) (out []CheckResult) {
 	name := "scenario " + filepath.Base(file)
 	sc, err := scenario.LoadFile(file)
 	if err != nil {
 		return []CheckResult{fail(name, err.Error())}
 	}
 
-	d, err := startDriver(f)
+	r, err := prepareCheck(ctx, f, "scenario", sc, fakevendorDir, "")
 	if err != nil {
-		return []CheckResult{fail(name, "start: "+err.Error())}
+		return []CheckResult{fail(name, safeError(err))}
 	}
-	defer d.Close()
-
-	tmp, err := os.MkdirTemp("", "arvel-scenario-")
-	if err != nil {
-		return []CheckResult{fail(name, err.Error())}
+	defer r.finish(&out)
+	var res mockhost.ScenarioResult
+	_, runErr := r.initialize()
+	if runErr == nil {
+		res, runErr = r.prepared.RunInitialized(ctx, r.d)
 	}
-	defer os.RemoveAll(tmp)
 
-	res, runErr := d.RunScenario(sc, mockhost.ScenarioOptions{Tmpdir: tmp, FakevendorDir: fakevendorDir})
-
-	var out []CheckResult
 	for i, st := range res.Steps {
 		stepName := fmt.Sprintf("%s · step %d %s", name, i+1, st.Call)
 		if st.Pass {
@@ -97,7 +93,7 @@ func runOneScenario(ctx context.Context, f *flags, file, fakevendorDir string) [
 
 	switch {
 	case runErr != nil:
-		out = append(out, fail(name, runErr.Error()))
+		out = append(out, fail(name, safeError(runErr)))
 	case res.Pass:
 		out = append(out, pass(name, fmt.Sprintf("%d steps", len(res.Steps))))
 	default:

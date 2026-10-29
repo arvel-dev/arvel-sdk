@@ -184,6 +184,13 @@ The checker reports skips when the echo turn finishes too fast for cancel/busy
 or no fake-vendor proxy scenario exists; a green result does not prove skipped
 paths. Supply those fixtures for a vendor-spawning provider.
 
+For declared connections requiring test config or synthetic secrets, use
+[`--test-env`](CONFORMANCE-ENVIRONMENT.md). It supplies consistent initialization
+to every applicable check, supports scenario overrides and prepares `plugin.env`
+before startup. Configure streaming, unfinished turns for cancel/busy: explicit
+mode fails when those assertions cannot be exercised. Testkit callers can use
+`NewEnvironment` and `PrepareScenario`; existing host method signatures remain.
+
 Run `go test -race ./...` with a working C compiler, then build releases with
 `CGO_ENABLED=0`. Copy the [provider README](../templates/README.plugin.md), binary
 CI/release workflows, `.goreleaser.yaml`, manifest and both scripts from

@@ -80,8 +80,8 @@ func TestProviderBasic_StubFailures(t *testing.T) {
 		// The stub is built on the SDK, so the plugin framework validates the
 		// models result before it reaches the wire and answers a generic -32000
 		// "invalid models result" error; the conformance CLI reports that.
-		{"duplicate-model", "models", "invalid models result"},
-		{"unknown-effort", "models", "invalid models result"},
+		{"duplicate-model", "models", "RPC code -32000"},
+		{"unknown-effort", "models", "RPC code -32000"},
 		{"echo-canary", "canary leak", "appeared in plugin output"},
 	}
 	for _, c := range cases {

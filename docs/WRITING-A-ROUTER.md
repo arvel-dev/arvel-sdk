@@ -107,6 +107,11 @@ Release runs scenarios and 100 seeded requests with varied task types, built-in
 and plugin slots, validating announced features under a 3-second deadline. Add a
 fake-service stall fixture when routing calls a remote service.
 
+Use [`--test-env`](CONFORMANCE-ENVIRONMENT.md) to select a declared test connection
+and supply synthetic config/secrets to basic, scenarios and route validity.
+Router checks retain their routing contract and never run provider session probes.
+The same guide describes scenario startup env, overrides and owned directories.
+
 Use the [router README](../templates/README.router.md) and binary CI/release
 templates. Start with the **router example's manifest**, rather than the generic
 provider manifest; replace six platform asset/bin entries, project_name and

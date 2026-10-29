@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/arvel-dev/arvel-sdk/internal/leakcheck"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,8 @@ func TestListTools_TwoTools(t *testing.T) {
 	if len(tools) != 2 || tools[0] != "alpha" || tools[1] != "beta" {
 		t.Fatalf("tools = %v, want [alpha beta]", tools)
 	}
+	// listTools must join its peer before returning, while caller ctx is alive.
+	leakcheck.Check(t, "jsonrpc.(*Peer)")
 }
 
 // A server that never answers must fail when the caller's deadline fires, not

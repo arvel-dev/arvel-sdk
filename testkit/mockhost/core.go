@@ -5,6 +5,7 @@ package mockhost
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"sync"
 	"time"
@@ -40,14 +41,30 @@ type core struct {
 	stdoutW    *io.PipeWriter // plugin stdout -> mockhost (closed to end our read)
 	done       chan struct{}  // closed when Run returns (in-process) or the proc exits
 
-	closeOnce sync.Once
+	closeOnce      sync.Once
+	closeErr       error
+	environment    *Environment
+	ownEnvironment bool
+	cleanups       []func() error
 }
 
 // startCoreInProcess builds a core that runs the provider/plugin in-process.
-func startCoreInProcess(run func(context.Context, []plugin.Option) error, opts []plugin.Option) *core {
+func startCoreInProcess(run func(context.Context, []plugin.Option) error, opts []plugin.Option, env *Environment) (*core, error) {
+	own := env == nil
+	if own {
+		var err error
+		env, err = NewEnvironment(EnvironmentOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := env.acquire(); err != nil {
+		return nil, err
+	}
 	c2sR, c2sW := io.Pipe() // mockhost -> plugin stdin
 	s2cR, s2cW := io.Pipe() // plugin stdout -> mockhost
 	c := &core{
+		environment: env, ownEnvironment: own,
 		stderr:  &syncBuffer{},
 		stdout:  &syncBuffer{},
 		updates: map[string][]map[string]any{},
@@ -76,7 +93,7 @@ func startCoreInProcess(run func(context.Context, []plugin.Option) error, opts [
 	peerCtx, peerCancel := context.WithCancel(context.Background())
 	c.peerCancel = peerCancel
 	go func() { _ = c.peer.Serve(peerCtx); close(c.peerDone) }()
-	return c
+	return c, nil
 }
 
 // startCore launches a plugin binary and returns a core that drives it.
@@ -85,9 +102,21 @@ func startCore(binaryPath string, opts ...StartOption) (*core, error) {
 	for _, opt := range opts {
 		opt(&o)
 	}
+	own := o.environment == nil
+	if own {
+		var err error
+		o.environment, err = NewEnvironment(EnvironmentOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := o.environment.acquire(); err != nil {
+		return nil, err
+	}
 	c2sR, c2sW := io.Pipe() // mockhost -> plugin stdin
 	s2cR, s2cW := io.Pipe() // plugin stdout -> mockhost
 	c := &core{
+		environment: o.environment, ownEnvironment: own,
 		stderr:  &syncBuffer{},
 		stdout:  &syncBuffer{},
 		updates: map[string][]map[string]any{},
@@ -108,6 +137,10 @@ func startCore(binaryPath string, opts ...StartOption) (*core, error) {
 		Stderr: c.stderr,
 	})
 	if err != nil {
+		o.environment.release()
+		if own {
+			_ = o.environment.Close()
+		}
 		cancel()
 		_ = c2sR.Close()
 		_ = c2sW.Close()
@@ -174,9 +207,10 @@ func (c *core) Initialize(meta protocol.InitMeta) (protocol.InitResultMeta, erro
 
 // InitializeCtx sends initialize under the caller's context (deadline).
 func (c *core) InitializeCtx(ctx context.Context, meta protocol.InitMeta) (protocol.InitResultMeta, error) {
-	if meta.PluginAPI == "" {
-		meta.PluginAPI = protocol.PluginAPI
+	if _, err := json.Marshal(meta); err != nil {
+		return protocol.InitResultMeta{}, errors.New("mockhost: invalid initialization metadata")
 	}
+	meta = c.environment.fill(meta)
 	var res struct {
 		Meta struct {
 			Arvel protocol.InitResultMeta `json:"arvel"`
@@ -230,47 +264,73 @@ func (c *core) waitDone(d time.Duration) error {
 	case <-done:
 		return nil
 	case <-time.After(d):
-		return &timeoutError{d: d, stderr: c.stderr.String()}
+		return &timeoutError{d: d}
 	}
 }
 
 // timeoutError reports that the plugin did not exit in time.
 type timeoutError struct {
-	d      time.Duration
-	stderr string
+	d time.Duration
 }
 
 func (e *timeoutError) Error() string {
-	return "plugin did not exit within " + e.d.String() + "; stderr=" + e.stderr
+	return "plugin did not exit within " + e.d.String()
 }
 
 // Close tears the connection down. It is idempotent and safe to call from
 // t.Cleanup or defer.
-func (c *core) Close() {
+func (c *core) Close() { _ = c.CloseWithError() }
+
+// CloseWithError stops and joins the driver. Unconfirmed teardown retains files.
+func (c *core) CloseWithError() error {
 	c.closeOnce.Do(func() {
 		c.cancel()
+		_ = c.stdinW.Close()
 		if c.proc == nil {
 			select {
 			case <-c.done:
 			case <-time.After(5 * time.Second):
+				c.closeErr = errors.New("mockhost: server teardown timed out")
+			}
+		} else {
+			select {
+			case <-c.proc.Done():
+			case <-time.After(5 * time.Second):
+				c.proc.KillTree(0)
+			}
+			select {
+			case <-c.proc.Done():
+				if _, err := c.proc.Wait(); err != nil {
+					c.closeErr = errors.New("mockhost: process wait failed")
+				}
+			default:
+				c.closeErr = errors.New("mockhost: process teardown unconfirmed")
 			}
 		}
-		_ = c.stdinW.Close()
+		// Keep the peer draining stdout until process writers have finished.
 		_ = c.stdoutW.Close()
 		c.peerCancel()
 		select {
 		case <-c.peerDone:
 		case <-time.After(5 * time.Second):
+			c.closeErr = errors.New("mockhost: peer teardown timed out")
 		}
-		if c.proc != nil {
-			select {
-			case <-c.proc.Done():
-			case <-time.After(5 * time.Second):
-				c.proc.KillTree(5 * time.Second)
+		if c.closeErr != nil {
+			return
+		}
+		c.environment.release()
+		for _, f := range c.cleanups {
+			if err := f(); err != nil {
+				c.closeErr = err
 			}
-			_, _ = c.proc.Wait()
+		}
+		if c.ownEnvironment {
+			if err := c.environment.Close(); err != nil {
+				c.closeErr = err
+			}
 		}
 	})
+	return c.closeErr
 }
 
 // Stderr returns the captured stderr text of the plugin process.

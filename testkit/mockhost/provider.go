@@ -48,7 +48,7 @@ func (c *core) NewSession(meta protocol.SessionMeta) (string, error) {
 		SessionID string `json:"sessionId"`
 	}
 	err := c.call(protocol.MethodSessionNew, map[string]any{
-		"cwd":        "/",
+		"cwd":        c.environment.Workspace(),
 		"mcpServers": []acp.McpServer{},
 		"_meta":      protocol.WithMeta(nil, meta),
 	}, &res)
@@ -59,7 +59,7 @@ func (c *core) NewSession(meta protocol.SessionMeta) (string, error) {
 func (c *core) LoadSession(id string, meta protocol.SessionMeta) error {
 	return c.call(protocol.MethodSessionLoad, map[string]any{
 		"sessionId":  id,
-		"cwd":        "/",
+		"cwd":        c.environment.Workspace(),
 		"mcpServers": []acp.McpServer{},
 		"_meta":      protocol.WithMeta(nil, meta),
 	}, nil)

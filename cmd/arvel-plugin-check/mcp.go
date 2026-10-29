@@ -38,6 +38,10 @@ func listTools(ctx context.Context, command []string, dir string) ([]string, err
 		defer cancel()
 	}
 
+	runCtx, stopProcess := context.WithCancel(ctx)
+	defer stopProcess()
+	ctx = runCtx
+
 	c2sR, c2sW := io.Pipe() // checker -> server stdin
 	s2cR, s2cW := io.Pipe() // server stdout -> checker
 	proc, err := procx.Start(ctx, procx.Spec{
@@ -57,16 +61,17 @@ func listTools(ctx context.Context, command []string, dir string) ([]string, err
 	}
 
 	peer := jsonrpc.NewPeer(s2cR, c2sW)
-	go func() { _ = peer.Serve(ctx) }()
-
-	// Closing stdin ends the server; the ctx cancel (below) kills the tree if it
-	// ignores EOF.
+	peerDone := make(chan struct{})
+	go func() { defer close(peerDone); _ = peer.Serve(ctx) }()
 	defer func() {
 		_ = c2sW.Close()
-		select {
-		case <-proc.Done():
-		case <-time.After(2 * time.Second):
-		}
+		stopProcess()
+		proc.KillTree(0)
+		_ = s2cW.Close()
+		_, _ = proc.Wait()
+		<-peerDone
+		_ = c2sR.Close()
+		_ = s2cR.Close()
 	}()
 
 	if err := peer.Call(ctx, "initialize", map[string]any{

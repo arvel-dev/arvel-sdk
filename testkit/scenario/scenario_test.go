@@ -100,6 +100,44 @@ func TestResolveString(t *testing.T) {
 	if _, err := r.ResolveString("{{unterminated"); err == nil {
 		t.Fatal("unterminated did not error")
 	}
+	if _, err := r.ResolveString("prefix}}-{{tmpdir}}"); err == nil {
+		t.Fatal("stray closing delimiter accepted")
+	}
+}
+
+func TestLoad_InitializeAliasesAndMerge(t *testing.T) {
+	for _, source := range []string{
+		"name: aliases\ninitialize:\n  <<: &base\n    connection: {kind: synthetic}\n  dataDir: '{{tmpdir}}'\nsteps: [{call: _arvel/status}]\n",
+		"name: aliases\ninitialize:\n  connection:\n    <<: &connection {kind: synthetic, config: {enabled: false}}\n    secrets: {token: synthetic}\nsteps: [{call: _arvel/status}]\n",
+	} {
+		sc, err := Load(strings.NewReader(source))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !sc.Initialize.KindSpecified() || sc.Initialize.Connection.Kind != "synthetic" {
+			t.Fatal("alias kind lost")
+		}
+	}
+}
+
+func TestLoad_ShallowMergeKindPresence(t *testing.T) {
+	for _, override := range []string{"{config: {count: 2}}", "null"} {
+		input := "name: shadow\ninitialize:\n  <<: {connection: {kind: synthetic}}\n  connection: " + override + "\nsteps: [{call: _arvel/status}]"
+		sc, err := Load(strings.NewReader(input))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sc.Initialize.KindSpecified() {
+			t.Fatal("shadowed YAML kind was treated as explicit")
+		}
+	}
+}
+
+func TestLoad_InvalidPermissionDiagnosticOmitsValue(t *testing.T) {
+	_, err := Load(strings.NewReader("name: invalid\nsteps: [{call: _arvel/status, answerPermissions: private-sentinel}]"))
+	if err == nil || strings.Contains(err.Error(), "private-sentinel") {
+		t.Fatal("invalid permission diagnostic exposed input")
+	}
 }
 
 func TestResolve_Recursive(t *testing.T) {

@@ -59,7 +59,16 @@ func InProcessRouter(t testing.TB, r plugin.Router, opts ...plugin.Option) *Host
 
 func startInProcess(t testing.TB, run func(context.Context, []plugin.Option) error, opts []plugin.Option) *Host {
 	t.Helper()
-	h := &Host{tb: t, core: startCoreInProcess(run, opts)}
+	return startInProcessEnvironment(t, run, opts, nil)
+}
+
+func startInProcessEnvironment(t testing.TB, run func(context.Context, []plugin.Option) error, opts []plugin.Option, env *Environment) *Host {
+	t.Helper()
+	c, err := startCoreInProcess(run, opts, env)
+	if err != nil {
+		t.Fatalf("mockhost: environment: %v", err)
+	}
+	h := &Host{tb: t, core: c}
 	t.Cleanup(func() {
 		h.Close()
 		leakcheck.Check(t, "plugin.(*providerServer)", "plugin.(*routerServer)", "plugin.(*core)",
@@ -70,9 +79,10 @@ func startInProcess(t testing.TB, run func(context.Context, []plugin.Option) err
 
 // startOptions configure Start.
 type startOptions struct {
-	args []string
-	dir  string
-	env  []string
+	args        []string
+	dir         string
+	env         []string
+	environment *Environment
 }
 
 // StartOption configures Start.
@@ -114,4 +124,19 @@ func (h *Host) Shutdown() {
 	if err := h.core.shutdown(); err != nil {
 		h.tb.Fatalf("shutdown: %v", err)
 	}
+}
+
+// WithEnvironment borrows a context; close the driver before the environment.
+func WithEnvironment(e *Environment) StartOption { return func(o *startOptions) { o.environment = e } }
+
+// InProcessWithEnvironment starts a provider with a borrowed test context.
+func InProcessWithEnvironment(t testing.TB, p plugin.Provider, e *Environment, opts ...plugin.Option) *Host {
+	t.Helper()
+	return startInProcessEnvironment(t, func(ctx context.Context, o []plugin.Option) error { return plugin.Run(ctx, p, o...) }, opts, e)
+}
+
+// InProcessRouterWithEnvironment starts a router with a borrowed test context.
+func InProcessRouterWithEnvironment(t testing.TB, r plugin.Router, e *Environment, opts ...plugin.Option) *Host {
+	t.Helper()
+	return startInProcessEnvironment(t, func(ctx context.Context, o []plugin.Option) error { return plugin.RunRouter(ctx, r, o...) }, opts, e)
 }

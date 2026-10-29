@@ -3,7 +3,9 @@
 package scenario
 
 import (
-	"fmt"
+	"errors"
+	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -13,6 +15,9 @@ type Resolver struct {
 	Vars map[string]string
 	// Tmpdir is the value of {{tmpdir}}.
 	Tmpdir string
+	// DataDir and Workspace are static owned-directory placeholders.
+	DataDir   string
+	Workspace string
 	// Fakevendor resolves {{fakevendor:name}} to a binary path. It may be nil,
 	// in which case a fakevendor placeholder is an error.
 	Fakevendor func(name string) (string, error)
@@ -25,12 +30,18 @@ func (r Resolver) ResolveString(s string) (string, error) {
 	for {
 		i := strings.Index(s, "{{")
 		if i < 0 {
+			if strings.Contains(s, "}}") {
+				return "", errors.New("scenario: unmatched placeholder delimiter")
+			}
 			b.WriteString(s)
 			return b.String(), nil
 		}
 		j := strings.Index(s[i:], "}}")
 		if j < 0 {
-			return "", fmt.Errorf("scenario: unterminated placeholder in %q", s)
+			return "", errors.New("scenario: unterminated placeholder")
+		}
+		if strings.Contains(s[:i], "}}") {
+			return "", errors.New("scenario: unmatched placeholder delimiter")
 		}
 		b.WriteString(s[:i])
 		name := strings.TrimSpace(s[i+2 : i+j])
@@ -46,18 +57,34 @@ func (r Resolver) ResolveString(s string) (string, error) {
 func (r Resolver) lookup(name string) (string, error) {
 	switch {
 	case name == "tmpdir":
+		if r.Tmpdir == "" {
+			return "", errors.New("scenario: tmpdir is unavailable")
+		}
 		return r.Tmpdir, nil
+	case name == "dataDir":
+		if r.DataDir == "" {
+			return "", errors.New("scenario: dataDir is unavailable")
+		}
+		return r.DataDir, nil
+	case name == "workspace":
+		if r.Workspace == "" {
+			return "", errors.New("scenario: workspace is unavailable")
+		}
+		return r.Workspace, nil
 	case strings.HasPrefix(name, "fakevendor:"):
 		n := strings.TrimPrefix(name, "fakevendor:")
+		if n == "" || n == "." || n == ".." || filepath.IsAbs(n) || strings.ContainsAny(n, "/\\:") {
+			return "", errors.New("scenario: invalid fake executable name")
+		}
 		if r.Fakevendor == nil {
-			return "", fmt.Errorf("scenario: {{fakevendor:%s}} has no fakevendor hook", n)
+			return "", errors.New("scenario: fake executable hook is unavailable")
 		}
 		return r.Fakevendor(n)
 	default:
 		if v, ok := r.Vars[name]; ok {
 			return v, nil
 		}
-		return "", fmt.Errorf("scenario: unknown variable {{%s}}", name)
+		return "", errors.New("scenario: unknown or unavailable placeholder")
 	}
 }
 
@@ -68,8 +95,30 @@ func (r Resolver) Resolve(v any) (any, error) {
 		return r.ResolveString(x)
 	case map[string]any:
 		out := make(map[string]any, len(x))
-		for k, e := range x {
+		keys := make([]string, 0, len(x))
+		for k := range x {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+		for _, k := range keys {
+			e := x[k]
 			rv, err := r.Resolve(e)
+			if err != nil {
+				return nil, err
+			}
+			out[k] = rv
+		}
+		return out, nil
+	case map[string]string:
+		out := make(map[string]string, len(x))
+		keys := make([]string, 0, len(x))
+		for k := range x {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+		for _, k := range keys {
+			v := x[k]
+			rv, err := r.ResolveString(v)
 			if err != nil {
 				return nil, err
 			}

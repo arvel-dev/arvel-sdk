@@ -52,6 +52,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 func dispatch(ctx context.Context, f *flags) *Report {
 	// --package is declarative mode: there is no plugin binary.
 	if f.pkg != "" {
+		if f.testEnv != "" {
+			rep := &Report{Level: f.level}
+			rep.add(fail("test environment", "--test-env applies only to provider/router binaries"))
+			return rep
+		}
 		return runDeclarative(ctx, f)
 	}
 
@@ -62,6 +67,21 @@ func dispatch(ctx context.Context, f *flags) *Report {
 		return rep
 	}
 
+	f.loaded = m
+	if f.testEnv != "" {
+		if m.Type.Declarative() {
+			rep := &Report{Plugin: f.manifest, Kind: string(m.Type), Level: f.level}
+			rep.add(fail("test environment", "--test-env applies only to provider/router binaries"))
+			return rep
+		}
+		cfg, err := loadTestConfiguration(f.testEnv)
+		if err != nil {
+			rep := &Report{Plugin: f.binary, Kind: string(m.Type), Level: f.level}
+			rep.add(fail("test environment", err.Error()))
+			return rep
+		}
+		f.config = cfg
+	}
 	switch m.Type {
 	case manifest.TypeProvider:
 		return runProvider(ctx, f, m)
