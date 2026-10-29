@@ -70,12 +70,37 @@ Echo stores sessions in memory, announces resume and returns deterministic model
 and fake usage data. Replace those numbers with real measurements or unknowns.
 Implement `plugin.HostAware.SetHost(plugin.Host)` if you need status/usage
 notifications or the redacting logger; the framework calls it before Initialize.
+The five-second initialization deadline does not include slow vendor checks in
+`Status`; honor each request context and use a separate bounded status wait.
 Identical consecutive status notifications are dropped, and usage notifications
 are throttled to one per five seconds with the last value retained.
 
 Optional `plugin.Discoverer` enables `_arvel/discover`. Return secret/envRef
 references for discovered credentials, never credential values. Optional
 `plugin.ConfigOptioner` on a session supplies model/thought-level config options.
+
+## Verify recovery across process lifetimes
+
+A repeated `session/load` in one SDK server can return an already registered
+session without calling the provider's `LoadSession` again. Test a fresh plugin
+server and vendor process as well: initialize with the same explicit connection
+and private data directory, load the original session ID and cwd, then send a
+new prompt. Assert that only the new turn produces live output, usage and
+permission decisions, that cancellation still works, and that the original
+permissions/MCP/skills scope remains effective.
+
+Add deterministic fake-vendor cases for delayed old text, lifecycle, usage and
+approval events around resume and the next turn-start reply. Restore historical
+identities using the vendor's supported response fields; keep unknown-identity
+failures strict. No additional Arvel wire field is needed for vendor turn IDs.
+Record a bounded opt-in native restart test separately from SDK/mock-host tests.
+Never copy shared authentication to make recovery pass. See
+[PROTOCOL §7.4](PROTOCOL.md#74-sessionload-resume).
+
+The testkit checks fresh SDK-server dispatch with a stable environment. It does
+not certify a provider's vendor transport or native persistence. Echo's in-memory
+example is a wire demonstration; use your provider's own durable vendor state
+for production recovery.
 
 ## One session, one running turn
 

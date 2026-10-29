@@ -8,6 +8,9 @@ change the Go API; every such change carries a migration note. The protocol
 
 ## [Unreleased]
 
+### Changed
+- Clarified session recovery across plugin/vendor restarts, historical turn isolation and the boundary between SDK dispatch and provider persistence.
+
 ## [0.2.0] - 2026-10-29
 
 ### Added

@@ -472,6 +472,28 @@ Subagents: every update produced inside a subagent carries `_meta.arvel.subagent
 
 `session/load { sessionId, cwd, mcpServers, _meta.arvel }` resumes a vendor session (same model unless overridden). The plugin replays history as `session/update` notifications only if the vendor exposes it; otherwise it resumes silently and the host uses its own stored feed.
 
+Recovery can follow a host, plugin or vendor-process restart. The ACP session ID
+still identifies the original vendor conversation; a plugin must reconstruct
+its mapping and apply the supplied connection, cwd and policy without relying
+on the previous process's in-memory session object. If that conversation cannot
+be recovered, return an explicit error rather than silently creating an empty
+conversation under the old ID.
+
+Vendor resume responses may include historical turn IDs, and delayed vendor
+notifications may refer to completed turns. Those events must not bind a new
+prompt's turn identity, complete its result, consume its budget or become its
+live output/permission request. A provider should restore known terminal turn
+identities from the vendor's public resume surface and distinguish replay from
+current-turn events. Unknown or conflicting identities still require an error;
+discarding all mismatched events would hide a broken live stream.
+
+History replay belongs to the load operation. The host keeps its durable feed
+and should distinguish any replay from the subsequent prompt's live output.
+`loadSession` advertises the provider's recovery capability; the SDK dispatches
+the load but does not persist vendor mappings, inspect vendor history or deduce
+whether a model request was delivered. The host decides how to handle an
+uncertain interrupted turn before sending another prompt.
+
 ### 7.5 Switching model / effort
 
 `session/set_config_option` with `configId` `model` or `effort`. Applies **from the next turn**. If the vendor can switch live, do it; else restart the vendor process with resume at the next turn boundary. Never interrupt a running turn for this.
